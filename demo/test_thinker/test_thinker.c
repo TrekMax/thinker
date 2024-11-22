@@ -135,55 +135,54 @@ int thinker_task_test(int loop_count, char *argv[])
 	input.shape_.dims_[1] = in_c;
     input.shape_.dims_[2] = in_h;
     input.shape_.dims_[3] = in_w;
+    printf("scale: %d\n", scale);
+    printf("input shape: %d, %d, %d, %d\n", input.shape_.dims_[0],
+           input.shape_.dims_[1], input.shape_.dims_[2], input.shape_.dims_[3]);
 
-	uint32_t clk = 0;
-	for(i = 0; i < loop_count; i++)
-	{
-		ret = tSetInput(hdl, 0, &input);
-		if (ret != T_SUCCESS) {
-			printf("tSetInput failed, error coe:%d\n", ret);
-			return ret;
-		}
+    uint32_t clk = 0;
+    for (i = 0; i < loop_count; i++) {
+      ret = tSetInput(hdl, 0, &input);
+      if (ret != T_SUCCESS) {
+        printf("tSetInput failed, error coe:%d\n", ret);
+        return ret;
+      }
 
-		ret = tForward(hdl);
-		if (ret != T_SUCCESS) {
-			printf("tForward failed, error code:%d\n", ret);
-			return ret;
-		}
-		else{
-			printf("forward successful!\n");
-		}
+      ret = tForward(hdl);
+      if (ret != T_SUCCESS) {
+        printf("tForward failed, error code:%d\n", ret);
+        return ret;
+      } else {
+        printf("forward successful!\n");
+      }
 
-		tData output[5];
-		int getoutputcount = tGetOutputCount(model_hdl);
+      tData output[5];
+      int getoutputcount = tGetOutputCount(model_hdl);
 
-		for(j = 0; j < getoutputcount; j++)
-		{
-			ret = tGetOutput(hdl, j, &output[j]);
-			if (ret != T_SUCCESS) {
-				printf("tGetOutput_%d failed, error code: %d\n", j, ret);
-				return ret;
-			}
-		}
+      for (j = 0; j < getoutputcount; j++) {
+        ret = tGetOutput(hdl, j, &output[j]);
+        if (ret != T_SUCCESS) {
+          printf("tGetOutput_%d failed, error code: %d\n", j, ret);
+          return ret;
+        }
+      }
 
-		int8_t *output_data = (int8_t *)output[0].dptr_;
-		int output_length = output[0].shape_.dims_[1];
+      int8_t *output_data = (int8_t *)output[0].dptr_;
+      int output_length = output[0].shape_.dims_[1];
 
-		int predicted_category_index = 0;
-		int8_t max_probability = output_data[0];
+      int predicted_category_index = 0;
+      int8_t max_probability = output_data[0];
 
-		for (int idx = 1; idx < output_length; idx++) {
-			if (output_data[idx] > max_probability)
-			{
-				max_probability = output_data[idx];
-				predicted_category_index = idx;
-			}
-		}
+      for (int idx = 1; idx < output_length; idx++) {
+        if (output_data[idx] > max_probability) {
+          max_probability = output_data[idx];
+          predicted_category_index = idx;
+        }
+      }
 
-		printf("Predicted category index: %d\n", predicted_category_index);
-		printf("Predicted label: %s\n", classes[predicted_category_index]);	
+      printf("Predicted category index: %d\n", predicted_category_index);
+      printf("Predicted label: %s\n", classes[predicted_category_index]);
 
-		save_bin_file(output_file, output_data, output_length);
+      save_bin_file(output_file, output_data, output_length);
 	}
 	tUninitialize();
     return ret;
@@ -193,7 +192,7 @@ int main(int argc, char *argv[])
 {
 	if(argc < 8)
 	{
-		printf("commad:path of input file, path of model, path of output file, channel of input, height of input, width of input, QValue of input, loop num(opt)\n");
+		printf("command:path of input file, path of model, path of output file, channel of input, height of input, width of input, QValue of input, loop num(opt)\n");
 		return -1;
 	}
 	int loop_count = 1;
