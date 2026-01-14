@@ -131,7 +131,7 @@ int32_t avgpool2dint_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs
 
         if ((one_kernel_size & (one_kernel_size - 1)) == 0) { // kernel_size is power of 2
             int32_t *p_tmp = (int32_t *)Temp->dptr_;
-            shift = my_log2((float)one_kernel_size);
+            shift = my_log2((float)one_kernel_size) + X->scale_ - Y->scale_;
             if ((input_h_after_padding == k_h) && (input_w_after_padding == k_w)) { // kernel_size == input_size
                 int8_t *p0 = (int8_t *)Temp->dptr_;
                 int32_t *p1 = (int32_t *)(p0 + in_h * in_w);
