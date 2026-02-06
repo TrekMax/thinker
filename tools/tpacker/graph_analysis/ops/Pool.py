@@ -21,16 +21,10 @@ class PoolAttrs(OperatorAttrs):
         assert "pads" in self.attrs, "Missing required attribute: pads"
 
         ceil = CeilMode.from_int(self.attrs.get("ceil_mode", 0))
-        kernels = self.attrs.get("kernel_shape")
-        kernels = attr2tuple(kernels, (1, 1))
-        strides = self.attrs.get("strides")
-        strides = attr2tuple(strides, (1, 1))
-        pads = self.attrs.get("pads")
-        pads = attr2tuple(pads, (0, 0, 0, 0))
 
-        assert (kernels[-1] >= strides[-1] and kernels[-2] >= strides[-2]), "Kernel and stride sizes do not match"
-        assert (pads[0] <= kernels[-2] and pads[2] <= kernels[-2]), "Pad height exceeds kernel height"
-        assert (pads[1] <= kernels[-1] and pads[3] <= kernels[-1]), "Pad width exceeds kernel width"
+        strides = attr2tuple(self.attrs.get("strides"), (1, 1))
+        assert strides[0] in {1, 2, 4}, "Stride width exceeds limit"
+        assert strides[1] in {1, 2, 4}, "Stride height exceeds limit"
 
         layout = Layout.from_str(Layout, self.attrs.get("layout", "NCHW"))
         assert layout in {Layout.NCHW, Layout.NHWC}, "Invalid layout for Pool operation"
@@ -90,6 +84,11 @@ class MaxPool(Operator, PoolLayout):
                 assert 0 <= pads[1] <= 11, "pad_up for Conv2dInt exceed limit"
                 assert 0 <= pads[2] <= 11, "pad_right for Conv2dInt exceed limit"
                 assert 0 <= pads[3] <= 11, "pad_down for Conv2dInt exceed limit"
+
+            assert (kernels[0] >= strides[0] and kernels[1] >= strides[1]), "Kernel size must be >= stride size"
+            assert (pads[0] <= kernels[0] and pads[2] <= kernels[0]), "Pad width exceeds kernel width"
+            assert (pads[1] <= kernels[1] and pads[3] <= kernels[1]), "Pad height exceeds kernel height"
+
 
         shape = calc_pool2d_output_shape(X.shape, kernels, strides, (1, 1), pads, ceil_mode, layout)
         Y = X.clone(shape=tuple(shape), scale=X.scale)
@@ -178,6 +177,27 @@ class AvgPool2dInt(Operator, PoolLayout):
 
         h_in = calc_expr(str(X.shape[2]), dynamic_shape) if is_sympy(X.shape[2]) else X.shape[2]
         w_in = calc_expr(str(X.shape[3]), dynamic_shape) if is_sympy(X.shape[3]) else X.shape[3]
+
+        platform = self.attrs.get("platform", "venus")
+        if (kernels[0] != h_in + pads[0] + pads[-2]) and (kernels[1] != w_in + pads[1] + pads[-1]):
+            if platform == "venus":
+                assert 1 <= kernels[0] <= 5, "kernel_w for Conv2dInt exceed limit"
+                assert 1 <= kernels[1] <= 5, "kernel_h for Conv2dInt exceed limit"
+                assert 0 <= pads[0] <= 4, "pad_left for Conv2dInt exceed limit"
+                assert 0 <= pads[1] <= 4, "pad_up for Conv2dInt exceed limit"
+                assert 0 <= pads[2] <= 4, "pad_right for Conv2dInt exceed limit"
+                assert 0 <= pads[3] <= 4, "pad_down for Conv2dInt exceed limit"
+            elif platform in ("arcs", "venusa"):
+                assert 1<= kernels[0] <= 12, "kernel_w for Conv2dInt exceed limit"
+                assert 1<= kernels[1] <= 12, "kernel_h for Conv2dInt exceed limit"
+                assert 0 <= pads[0] <= 11, "pad_left for Conv2dInt exceed limit"
+                assert 0 <= pads[1] <= 11, "pad_up for Conv2dInt exceed limit"
+                assert 0 <= pads[2] <= 11, "pad_right for Conv2dInt exceed limit"
+                assert 0 <= pads[3] <= 11, "pad_down for Conv2dInt exceed limit"
+
+            assert (kernels[0] >= strides[0] and kernels[1] >= strides[1]), "Kernel size must be >= stride size"
+            assert (pads[0] <= kernels[0] and pads[2] <= kernels[0]), "Pad width exceeds kernel width"
+            assert (pads[1] <= kernels[1] and pads[3] <= kernels[1]), "Pad height exceeds kernel height"
 
         shape = calc_pool2d_output_shape(X.shape, kernels, strides, (1, 1), pads, ceil_mode, layout)
         Y = X.clone(shape=tuple(shape), scale=int(temp))

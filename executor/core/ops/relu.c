@@ -28,7 +28,6 @@
 int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_List *list) {
     CHECK_GE(num_tensor, (op->num_input_ + op->num_output_));  // Validate tensor count
     
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
     tTensor *Workspace = NULL;
 
     // Get workspace tensor if available
@@ -37,10 +36,10 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     }
 
 #if THINKER_USE_VENUS || THINKER_USE_ARCS || THINKER_USE_VENUSA
-    ret = relu_luna(tensors[0], tensors[op->num_input_], Workspace);  // Execute ReLU operation
+    THINKER_RET_CHECK(relu_luna(tensors[0], tensors[op->num_input_], Workspace), "relu_luna");  // Execute ReLU operation
 #endif
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #include "core/operator_template.h"

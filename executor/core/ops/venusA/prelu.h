@@ -26,20 +26,18 @@
  * @return Execution status
  */
 static int32_t calc_prelu(tTensor *X, tTensor *Y, uint32_t size, int32_t slope, int32_t post_shift) {
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
-
     // Determine data types and call corresponding PReLU function
     switch (X->dtype_) {
         case Int8:
             switch (Y->dtype_) {
                 case Int8:
-                    ret = API_LIB(prelu_i8o8)((int8_t *)X->dptr_, slope, (int8_t *)Y->dptr_, size, post_shift);
+                    THINKER_RET_CHECK(API_LIB(prelu_i8o8)((int8_t *)X->dptr_, slope, (int8_t *)Y->dptr_, size, post_shift), "luna_prelu_i8o8");
                     break;
                 case Int16:
-                    ret = API_LIB(prelu_i8o16)((int8_t *)X->dptr_, slope, (int16_t *)Y->dptr_, size, post_shift);
+                    THINKER_RET_CHECK(API_LIB(prelu_i8o16)((int8_t *)X->dptr_, slope, (int16_t *)Y->dptr_, size, post_shift), "luna_prelu_i8o16");
                     break;
                 case Int32:
-                    ret = API_LIB(prelu_i8o32)((int8_t *)X->dptr_, slope, (int32_t *)Y->dptr_, size, post_shift);
+                    THINKER_RET_CHECK(API_LIB(prelu_i8o32)((int8_t *)X->dptr_, slope, (int32_t *)Y->dptr_, size, post_shift), "luna_prelu_i8o32");
                     break;
                 default:
                     return T_ERR_INVALID_DATATYPE;
@@ -48,13 +46,13 @@ static int32_t calc_prelu(tTensor *X, tTensor *Y, uint32_t size, int32_t slope, 
         case Int16:
             switch (Y->dtype_) {
                 case Int8:
-                    ret = API_LIB(prelu_i16o8)((int16_t *)X->dptr_, slope, (int8_t *)Y->dptr_, size, post_shift);
+                    THINKER_RET_CHECK(API_LIB(prelu_i16o8)((int16_t *)X->dptr_, slope, (int8_t *)Y->dptr_, size, post_shift), "luna_prelu_i16o8");
                     break;
                 case Int16:
-                    ret = API_LIB(prelu_i16o16)((int16_t *)X->dptr_, slope, (int16_t *)Y->dptr_, size, post_shift);
+                    THINKER_RET_CHECK(API_LIB(prelu_i16o16)((int16_t *)X->dptr_, slope, (int16_t *)Y->dptr_, size, post_shift), "luna_prelu_i16o16");
                     break;
                 case Int32:
-                    ret = API_LIB(prelu_i16o32)((int16_t *)X->dptr_, slope, (int32_t *)Y->dptr_, size, post_shift);
+                    THINKER_RET_CHECK(API_LIB(prelu_i16o32)((int16_t *)X->dptr_, slope, (int32_t *)Y->dptr_, size, post_shift), "luna_prelu_i16o32");
                     break;
                 default:
                     return T_ERR_INVALID_DATATYPE;
@@ -63,13 +61,13 @@ static int32_t calc_prelu(tTensor *X, tTensor *Y, uint32_t size, int32_t slope, 
         case Int32:
             switch (Y->dtype_) {
                 case Int8:
-                    ret = API_LIB(prelu_i32o8)((int32_t *)X->dptr_, slope, (int8_t *)Y->dptr_, size, post_shift);
+                    THINKER_RET_CHECK(API_LIB(prelu_i32o8)((int32_t *)X->dptr_, slope, (int8_t *)Y->dptr_, size, post_shift), "luna_prelu_i32o8");
                     break;
                 case Int16:
-                    ret = API_LIB(prelu_i32o16)((int32_t *)X->dptr_, slope, (int16_t *)Y->dptr_, size, post_shift);
+                    THINKER_RET_CHECK(API_LIB(prelu_i32o16)((int32_t *)X->dptr_, slope, (int16_t *)Y->dptr_, size, post_shift), "luna_prelu_i32o16");
                     break;
                 case Int32:
-                    ret = API_LIB(prelu_i32o32)((int32_t *)X->dptr_, slope, (int32_t *)Y->dptr_, size, post_shift);
+                    THINKER_RET_CHECK(API_LIB(prelu_i32o32)((int32_t *)X->dptr_, slope, (int32_t *)Y->dptr_, size, post_shift), "luna_prelu_i32o32");
                     break;
                 default:
                     return T_ERR_INVALID_DATATYPE;
@@ -79,7 +77,7 @@ static int32_t calc_prelu(tTensor *X, tTensor *Y, uint32_t size, int32_t slope, 
             return T_ERR_INVALID_DATATYPE;
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 /**
@@ -102,10 +100,7 @@ tStatus prelu_luna(tTensor *X, tTensor *Y, PreluAttrs *attrs) {
     int32_t post_shift = attrs->post_shift;
     uint32_t size = getTensorSize(X);
 
-    // Execute PReLU calculation
-    status = (tStatus)calc_prelu(X, Y, size, slope, post_shift);
-
-    return T_SUCCESS;
+    return calc_prelu(X, Y, size, slope, post_shift);
 }
 
 #endif

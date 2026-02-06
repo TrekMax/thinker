@@ -31,7 +31,6 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     
     // Get binary operation attributes
     iqBinaryAttrs *attrs = (iqBinaryAttrs *)((int8_t *)op + op->attr_offset_);
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
     
     // Get workspace tensor
     tTensor *workspace = ((tTensor **)tensors)[num_tensor - 1];
@@ -42,7 +41,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
 #endif
 
     // Call hardware-specific multiplication implementation
-    ret = iqmul_luna(tensors[0], tensors[1], tensors[op->num_input_], workspace, attrs);
+    THINKER_RET_CHECK(iqmul_luna(tensors[0], tensors[1], tensors[op->num_input_], workspace, attrs), "iqmul_luna");
 
 #if THINKER_PROFILE
     uint64_t finish_t = tick_count();
@@ -51,7 +50,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
 #endif
 #endif
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #include "core/operator_template.h"

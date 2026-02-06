@@ -22,7 +22,6 @@
  * @return int32_t Operation status
  */
 int32_t iqsigmoid(tTensor *X, tTensor *Y, tTensor *Temp) {
-    int32_t ret = T_ERR_FAIL;
     const int32_t Q_INPUT = 11;  // Input quantization bits
     const int32_t Q_OUTPUT = 7;  // Output quantization bits
     
@@ -50,23 +49,23 @@ int32_t iqsigmoid(tTensor *X, tTensor *Y, tTensor *Temp) {
         }
 #endif
         int16_t *dst_temp = (int16_t *)Temp->dptr_;
-        ret = API_LIB(scale_q15_int16)(src, 1, dst_temp, input_size, x_q - Q_INPUT);
+        THINKER_RET_CHECK(API_LIB(scale_q15_int16)(src, 1, dst_temp, input_size, x_q - Q_INPUT), "luna_scale_q15_int16");
         
         if (Y->dtype_ == Int8) {
-            ret |= API_LIB(sigmoid_int8)(dst_temp, (int8_t *)Y->dptr_, input_size);
+            THINKER_RET_CHECK(API_LIB(sigmoid_int8)(dst_temp, (int8_t *)Y->dptr_, input_size), "luna_sigmoid_int8");
         } else {
-            ret |= API_LIB(sigmoid)(dst_temp, (int16_t *)Y->dptr_, input_size);
+            THINKER_RET_CHECK(API_LIB(sigmoid)(dst_temp, (int16_t *)Y->dptr_, input_size), "luna_sigmoid");
         }
     } 
     else {
         if (Y->dtype_ == Int8) {
-            ret = API_LIB(sigmoid_int8)(src, (int8_t *)Y->dptr_, input_size);
+            THINKER_RET_CHECK(API_LIB(sigmoid_int8)(src, (int8_t *)Y->dptr_, input_size), "luna_sigmoid_int8");
         } else {
-            ret = API_LIB(sigmoid)(src, (int16_t *)Y->dptr_, input_size);
+            THINKER_RET_CHECK(API_LIB(sigmoid)(src, (int16_t *)Y->dptr_, input_size), "luna_sigmoid");
         }
     }
     
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif

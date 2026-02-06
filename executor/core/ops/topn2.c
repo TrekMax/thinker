@@ -30,13 +30,12 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     CHECK_GE(num_tensor, (op->num_input_ + op->num_output_));  // Validate tensor count
 
     topNAttrs *attrs = (topNAttrs *)((int8_t *)op + op->attr_offset_);
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
 
 #if THINKER_USE_VENUS || THINKER_USE_ARCS || THINKER_USE_VENUSA
-    ret = topn2_luna(tensors[0], tensors[op->num_input_], tensors[num_tensor - 1], attrs);
+    THINKER_RET_CHECK(topn2_luna(tensors[0], tensors[op->num_input_], tensors[num_tensor - 1], attrs), "topn2_luna");
 #endif
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #include "core/operator_template.h"

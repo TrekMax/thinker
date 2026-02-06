@@ -32,7 +32,6 @@ int32_t iqpad_luna(tTensor *X, tTensor *P, tTensor *data, tTensor *workspace, tT
         return T_ERR_INVALID_DATA;
     }
 
-    int32_t ret = T_SUCCESS;
     int32_t c_in = X->shape_.dims_[1];
     int32_t h_in = X->shape_.dims_[2];
     int32_t w_in = X->shape_.dims_[3];
@@ -110,7 +109,7 @@ int32_t iqpad_luna(tTensor *X, tTensor *P, tTensor *data, tTensor *workspace, tT
     }
 
     int8_t *temp = (int8_t *)workspace->dptr_;
-    API_LIB(mat_trans_q7)(src, temp, c_in, h_in * w_in);
+    THINKER_RET_CHECK(API_LIB(mat_trans_q7)(src, temp, c_in, h_in * w_in), "luna_mat_trans_q7");
 
     switch (mode) {
         case 0: {  // Constant padding (zero)
@@ -214,8 +213,8 @@ int32_t iqpad_luna(tTensor *X, tTensor *P, tTensor *data, tTensor *workspace, tT
         }
     }
 
-    API_LIB(mat_trans_q7)(dst, dst, h_out * w_out, c_out);
-    return ret;
+    THINKER_RET_CHECK(API_LIB(mat_trans_q7)(dst, dst, h_out * w_out, c_out), "luna_mat_trans_q7");
+    return T_SUCCESS;
 }
 
 #endif

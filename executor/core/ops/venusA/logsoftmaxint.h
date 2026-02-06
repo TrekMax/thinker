@@ -18,7 +18,70 @@
 
 /* Logarithm table for base 2 and natural logarithm */
 static const int32_t log2_table[] = {
-    /* Table data remains unchanged */
+	-2135405020, 1543054448, -2111388125, 1531138969,
+	-2087555976, 1519406104, -2063905754, 1507851685,
+	-2040434703, 1496471672, -2017140127, 1485262146,
+	-1994019392, 1474219305, -1971069924, 1463339458,
+	-1948289204, 1452619022, -1925674768, 1442054520,
+	-1903224206, 1431642574, -1880935160, 1421379903,
+	-1858805323, 1411263320, -1836832436, 1401289728,
+	-1815014290, 1391456116, -1793348719, 1381759558,
+	-1771833605, 1372197208, -1750466872, 1362766299,
+	-1729246487, 1353464140, -1708170460, 1344288112,
+	-1687236840, 1335235667, -1666443715, 1326304325,
+	-1645789212, 1317491671, -1625271494, 1308795357,
+	-1604888763, 1300213092, -1584639253, 1291742648,
+	-1564521234, 1283381855, -1544533010, 1275128595,
+	-1524672916, 1266980808, -1504939321, 1258936486,
+	-1485330622, 1250993669, -1465845250, 1243150448,
+	-1446481662, 1235404963, -1427238345, 1227755396,
+	-1408113815, 1220199979, -1389106614, 1212736982,
+	-1370215312, 1205364720, -1351438503, 1198081550,
+	-1332774808, 1190885865, -1314222872, 1183776099,
+	-1295781365, 1176750721, -1277448980, 1169808239,
+	-1259224434, 1162947194, -1241106464, 1156166160,
+	-1223093832, 1149463748, -1205185319, 1142838597,
+	-1187379730, 1136289378, -1169675887, 1129814795,
+	-1152072635, 1123413578, -1134568837, 1117084487,
+	-1117163376, 1110826311, -1099855152, 1104637864,
+	-1082643085, 1098517986, -1065526114, 1092465546,
+	-1048503192, 1086479433, -1031573292, 1080558564,
+	-1014735402, 1074701878, -997988529,  1068908337,
+	-981331693,  1063176925, -964763932,  1057506648,
+	-948284297,  1051896533, -931891857,  1046345628,
+	-915585693,  1040853000, -899364902,  1035417736,
+	-883228594,  1030038943, -867175895,  1024715744,
+	-851205942,  1019447283, -835317887,  1014232719,
+	-819510893,  1009071229, -803784139,  1003962008,
+	-788136812,  998904264,  -772568116,  993897226,
+	-757077264,  988940132,  -741663481,  984032241,
+	-726326004,  979172822,  -711064081,  974361162,
+	-695876973,  969596560,  -680763947,  964878328,
+	-665724287,  960205794,  -650757282,  955578296,
+	-635862234,  950995187,  -621038454,  946455831,
+	-606285264,  941959603,  -591601995,  937505894,
+	-576987987,  933094101,  -562442589,  928723637,
+	-547965161,  924393923,  -533555070,  920104392,
+	-519211692,  915854487,  -504934414,  911643662,
+	-490722627,  907471380,  -476575735,  903337114,
+	-462493147,  899240347,  -448474281,  895180571,
+	-434518564,  891157288,  -420625429,  887170007,
+	-406794316,  883218247,  -393024676,  879301537,
+	-379315963,  875419411,  -365667642,  871571413,
+	-352079181,  867757096,  -338550059,  863976020,
+	-325079760,  860227750,  -311667773,  856511864,
+	-298313597,  852827942,  -285016736,  849175574,
+	-271776698,  845554356,  -258593002,  841963892,
+	-245465169,  838403791,  -232392727,  834873669,
+	-219375212,  831373151,  -206412164,  827901864,
+	-193503129,  824459445,  -180647658,  821045534,
+	-167845309,  817659779,  -155095645,  814301834,
+	-142398234,  810971356,  -129752649,  807668010,
+	-117158469,  804391466,  -104615278,  801141400,
+	-92122664,   797917491,  -79680221,   794719425,
+	-67287549,   791546892,  -54944250,   788399588,
+	-42649932,   785277214,  -30404208,   782179473,
+	-18206696,   779106077,  -6057018,    776056738
 };
 
 /**
@@ -140,7 +203,6 @@ static void vec_logn_32x32_sim(int32_t *Y, const int32_t *X, int N) {
  * @return Execution status
  */
 int32_t logsoftmaxint_luna(tTensor *data, tTensor *out, tTensor *Workspace, LogSoftmaxIntAttrs *attrs) {
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
     int32_t SOFTMAX_Q_IN = 25;
     int32_t SOFTMAX_Q_OUT = 15;
     
@@ -162,62 +224,62 @@ int32_t logsoftmaxint_luna(tTensor *data, tTensor *out, tTensor *Workspace, LogS
         int32_t *p_tmp1 = (int32_t *)(p_tmp0 + data_size);
         int32_t *dst_tmp = p_tmp1 + 4 * data_size;
         
-        ret = API_LIB(scale_i8i8o16)((int8_t *)data->dptr_, 1, p_tmp0, data_size, 0);
-        ret |= API_LIB(scale_i16i16o32)(p_tmp0, 1, p_tmp1, data_size, 0);
-        ret |= API_LIB(scale_i32i32o32)(p_tmp1, (1 << (SOFTMAX_Q_IN - x_scale)), p_tmp1, data_size, 0);
+        THINKER_RET_CHECK(API_LIB(scale_i8i8o16)((int8_t *)data->dptr_, 1, p_tmp0, data_size, 0), "luna_scale_i8i8o16");
+        THINKER_RET_CHECK(API_LIB(scale_i16i16o32)(p_tmp0, 1, p_tmp1, data_size, 0), "luna_scale_i16i16o32");
+        THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(p_tmp1, (1 << (SOFTMAX_Q_IN - x_scale)), p_tmp1, data_size, 0), "luna_scale_i32i32o32");
         
         for (int32_t l = 0; l < leading; l++) {
             int32_t offset = l * stride;
-            ret |= API_LIB(logsoftmax_i32o32)(p_tmp1 + offset, dst_tmp + offset, stride);
+            THINKER_RET_CHECK(API_LIB(logsoftmax_i32o32)(p_tmp1 + offset, dst_tmp + offset, stride), "luna_logsoftmax_i32o32");
         }
         
         if (out->dtype_ == Int8) {
-            ret |= API_LIB(scale_i32i32o8)(dst_tmp, 1, (int8_t *)out->dptr_, data_size, (SOFTMAX_Q_OUT - y_scale));
+            THINKER_RET_CHECK(API_LIB(scale_i32i32o8)(dst_tmp, 1, (int8_t *)out->dptr_, data_size, (SOFTMAX_Q_OUT - y_scale)), "luna_scale_i32i32o8");
         } else if (out->dtype_ == Int16) {
-            ret |= API_LIB(scale_i32i32o16)(dst_tmp, 1, (int16_t *)out->dptr_, data_size, (SOFTMAX_Q_OUT - y_scale));
+            THINKER_RET_CHECK(API_LIB(scale_i32i32o16)(dst_tmp, 1, (int16_t *)out->dptr_, data_size, (SOFTMAX_Q_OUT - y_scale)), "luna_scale_i32i32o16");
         } else {
-            ret |= API_LIB(scale_i32i32o32)(dst_tmp, 1, (int32_t *)out->dptr_, data_size, (SOFTMAX_Q_OUT - y_scale));
+            THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(dst_tmp, 1, (int32_t *)out->dptr_, data_size, (SOFTMAX_Q_OUT - y_scale)), "luna_scale_i32i32o32");
         }
     } else if (data->dtype_ == Int16) {
         int32_t *p_tmp = (int32_t *)Workspace->dptr_;
         int32_t *dst_tmp = p_tmp + 4 * data_size;
         
-        ret = API_LIB(scale_i16i16o32)((int16_t *)data->dptr_, 1, p_tmp, data_size, 0);
-        ret |= API_LIB(scale_i32i32o32)(p_tmp, (1 << (SOFTMAX_Q_IN - x_scale)), p_tmp, data_size, 0);
+        THINKER_RET_CHECK(API_LIB(scale_i16i16o32)((int16_t *)data->dptr_, 1, p_tmp, data_size, 0), "luna_scale_i16i16o32");
+        THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(p_tmp, (1 << (SOFTMAX_Q_IN - x_scale)), p_tmp, data_size, 0), "luna_scale_i32i32o32");
         
         for (int32_t l = 0; l < leading; l++) {
             int32_t offset = l * stride;
-            ret |= API_LIB(logsoftmax_i32o32)(p_tmp + offset, dst_tmp + offset, stride);
+            THINKER_RET_CHECK(API_LIB(logsoftmax_i32o32)(p_tmp + offset, dst_tmp + offset, stride), "luna_logsoftmax_i32o32");
         }
         
         if (out->dtype_ == Int8) {
-            ret |= API_LIB(scale_i32i32o8)(dst_tmp, 1, (int8_t *)out->dptr_, data_size, (SOFTMAX_Q_OUT - y_scale));
+            THINKER_RET_CHECK(API_LIB(scale_i32i32o8)(dst_tmp, 1, (int8_t *)out->dptr_, data_size, (SOFTMAX_Q_OUT - y_scale)), "luna_scale_i32i32o8");
         } else if (out->dtype_ == Int16) {
-            ret |= API_LIB(scale_i32i32o16)(dst_tmp, 1, (int16_t *)out->dptr_, data_size, (SOFTMAX_Q_OUT - y_scale));
+            THINKER_RET_CHECK(API_LIB(scale_i32i32o16)(dst_tmp, 1, (int16_t *)out->dptr_, data_size, (SOFTMAX_Q_OUT - y_scale)), "luna_scale_i32i32o16");
         } else {
-            ret |= API_LIB(scale_i32i32o32)(dst_tmp, 1, (int32_t *)out->dptr_, data_size, (SOFTMAX_Q_OUT - y_scale));
+            THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(dst_tmp, 1, (int32_t *)out->dptr_, data_size, (SOFTMAX_Q_OUT - y_scale)), "luna_scale_i32i32o32");
         }
     } else if (data->dtype_ == Int32) {
         int32_t *p_tmp = (int32_t *)Workspace->dptr_;
         int32_t *dst_tmp = p_tmp + 4 * stride;
         
-        ret = API_LIB(scale_i32i32o32)((int32_t *)data->dptr_, (1 << (SOFTMAX_Q_IN - x_scale)), p_tmp, data_size, 0);
+        THINKER_RET_CHECK(API_LIB(scale_i32i32o32)((int32_t *)data->dptr_, (1 << (SOFTMAX_Q_IN - x_scale)), p_tmp, data_size, 0), "luna_scale_i32i32o32");
         
         for (int32_t l = 0; l < leading; l++) {
             int32_t offset = l * stride;
-            ret |= API_LIB(logsoftmax_i32o32)(p_tmp + offset, dst_tmp + offset, stride);
+            THINKER_RET_CHECK(API_LIB(logsoftmax_i32o32)(p_tmp + offset, dst_tmp + offset, stride), "luna_logsoftmax_i32o32");
         }
         
         if (out->dtype_ == Int8) {
-            ret |= API_LIB(scale_i32i32o8)(dst_tmp, 1, (int8_t *)out->dptr_, data_size, (SOFTMAX_Q_OUT - y_scale));
+            THINKER_RET_CHECK(API_LIB(scale_i32i32o8)(dst_tmp, 1, (int8_t *)out->dptr_, data_size, (SOFTMAX_Q_OUT - y_scale)), "luna_scale_i32i32o8");
         } else if (out->dtype_ == Int16) {
-            ret |= API_LIB(scale_i32i32o16)(dst_tmp, 1, (int16_t *)out->dptr_, data_size, (SOFTMAX_Q_OUT - y_scale));
+            THINKER_RET_CHECK(API_LIB(scale_i32i32o16)(dst_tmp, 1, (int16_t *)out->dptr_, data_size, (SOFTMAX_Q_OUT - y_scale)), "luna_scale_i32i32o16");
         } else {
-            ret |= API_LIB(scale_i32i32o32)(dst_tmp, 1, (int32_t *)out->dptr_, data_size, (SOFTMAX_Q_OUT - y_scale));
+            THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(dst_tmp, 1, (int32_t *)out->dptr_, data_size, (SOFTMAX_Q_OUT - y_scale)), "luna_scale_i32i32o32");
         }
     }
     
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif

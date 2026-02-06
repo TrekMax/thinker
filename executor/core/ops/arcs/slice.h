@@ -26,10 +26,7 @@
  * @param Y Output tensor
  * @return Operation result status
  */
-tStatus slice_luna(tTensor* X, int32_t begin, int32_t end, int32_t axis, int32_t step, tTensor* Y) 
-{
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
-
+tStatus slice_luna(tTensor* X, int32_t begin, int32_t end, int32_t axis, int32_t step, tTensor* Y) {
     // Normalize axis to handle negative values
     int32_t real_axis = (axis + X->shape_.ndim_) % X->shape_.ndim_;
     int32_t real_begin;
@@ -51,8 +48,7 @@ tStatus slice_luna(tTensor* X, int32_t begin, int32_t end, int32_t axis, int32_t
         }
         
         if (2 == Y->mem_.type_) {
-            ret = API_LIB(memcpy_i8o8)((int8_t*)Y->dptr_, (int8_t*)X->dptr_ + start * X->byte_, output_size * Y->byte_);
-            return ret;
+            THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t*)Y->dptr_, (int8_t*)X->dptr_ + start * X->byte_, output_size * Y->byte_), "luna_memcpy_i8o8");
         }
         else {
             opi_psram_cpy_out((int8_t*)Y->dptr_, (int8_t*)X->dptr_ + start * X->byte_, output_size * Y->byte_);
@@ -86,12 +82,12 @@ tStatus slice_luna(tTensor* X, int32_t begin, int32_t end, int32_t axis, int32_t
     for (int32_t l = 0; l < leading; l++) {
         int32_t i_lmt_this = l * i_mt + offset;
         int32_t o_lmt_this = l * o_mt;
-        ret = API_LIB(memcpy_i8o8)((int8_t*)Y->dptr_ + o_lmt_this * Y->byte_, 
+        THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t*)Y->dptr_ + o_lmt_this * Y->byte_, 
                                   (int8_t*)X->dptr_ + i_lmt_this * X->byte_, 
-                                  o_mt * Y->byte_);
+                                  o_mt * Y->byte_), "luna_memcpy_i8o8");
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif

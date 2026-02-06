@@ -241,7 +241,6 @@ static void vec_logn_32x32_sim(int32_t *Y, const int32_t *X, int N)
 
         Y[i] = yx;
     }
-    return;
 }
 
 /**
@@ -252,11 +251,9 @@ static void vec_logn_32x32_sim(int32_t *Y, const int32_t *X, int N)
  * @param attrs LogSoftmax attributes
  * @return Status code indicating success or failure
  */
-int32_t logsoftmaxint_luna(tTensor *data, tTensor *out, tTensor *Workspace, LogSoftmaxIntAttrs *attrs) 
-{
+int32_t logsoftmaxint_luna(tTensor *data, tTensor *out, tTensor *Workspace, LogSoftmaxIntAttrs *attrs) {
     const int32_t LOG_Q_IN = 25;
     const int32_t LOG_Q_OUT = 25;
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
     int32_t leading = 1, stride = 1;
     int32_t i = 0;
     int32_t axis = 1;
@@ -304,7 +301,7 @@ int32_t logsoftmaxint_luna(tTensor *data, tTensor *out, tTensor *Workspace, LogS
                 
                 // Handle PSRAM input
                 if (input_is_psram) {
-                    ret = API_LIB(memcpy_i8o8)((int8_t *)tmp2, (int8_t *)lsrc_tmp, max_once_size);
+                    THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)tmp2, (int8_t *)lsrc_tmp, max_once_size), "luna_memcpy_i8o8");
                     lsrc = (int8_t *)tmp2;
                 }
                 
@@ -314,11 +311,11 @@ int32_t logsoftmaxint_luna(tTensor *data, tTensor *out, tTensor *Workspace, LogS
                 }
                 
                 // Perform computations
-                ret = API_LIB(scale_i8i8o32)(lsrc, 1, tmp1, max_once_size, 0);  // Q4->Q25
-                ret |= API_LIB(scale_i32i32o32)(tmp1, (1 << (LOG_Q_IN - x_scale)), tmp2, max_once_size, 0);  // Q4->Q25
-                ret |= API_LIB(softmax_i32o32)((int32_t *)tmp1, (int32_t *)tmp2, max_once_size);  // Q25->Q16.15
+                THINKER_RET_CHECK(API_LIB(scale_i8i8o32)(lsrc, 1, tmp1, max_once_size, 0), "luna_scale_i8i8o32");  // Q4->Q25
+                THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(tmp1, (1 << (LOG_Q_IN - x_scale)), tmp2, max_once_size, 0), "luna_scale_i32i32o32");  // Q4->Q25
+                THINKER_RET_CHECK(API_LIB(softmax_i32o32)((int32_t *)tmp1, (int32_t *)tmp2, max_once_size), "luna_softmax_i32o32");  // Q25->Q16.15
                 vec_logn_32x32_sim((int32_t *)tmp2, (int32_t *)tmp1, max_once_size);  // Q16.15=>Q6.25
-                ret |= API_LIB(scale_i32i32o8)(tmp2, 1, ldst, max_once_size, (LOG_Q_OUT - y_scale));
+                THINKER_RET_CHECK(API_LIB(scale_i32i32o8)(tmp2, 1, ldst, max_once_size, (LOG_Q_OUT - y_scale)), "luna_scale_i32i32o8");
                 
                 // Copy result back if needed
                 if (output_is_psram) {
@@ -331,7 +328,7 @@ int32_t logsoftmaxint_luna(tTensor *data, tTensor *out, tTensor *Workspace, LogS
             
             // Process remaining elements
             if (input_is_psram) {
-                ret = API_LIB(memcpy_i8o8)((int8_t *)tmp2, (int8_t *)lsrc_tmp, i_src_size);
+                THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)tmp2, (int8_t *)lsrc_tmp, i_src_size), "luna_memcpy_i8o8");
                 lsrc = (int8_t *)tmp2;
             }
             
@@ -339,11 +336,11 @@ int32_t logsoftmaxint_luna(tTensor *data, tTensor *out, tTensor *Workspace, LogS
                 ldst = (int8_t *)tmp1;
             }
             
-            ret = API_LIB(scale_i8i8o32)(lsrc, 1, tmp1, i_src_size, 0);  // Q4->Q25
-            ret |= API_LIB(scale_i32i32o32)(tmp1, (1 << (LOG_Q_IN - x_scale)), tmp2, i_src_size, 0);  // Q4->Q25
-            ret |= API_LIB(softmax_i32o32)((int32_t *)tmp1, (int32_t *)tmp2, i_src_size);  // Q25->Q16.15
+            THINKER_RET_CHECK(API_LIB(scale_i8i8o32)(lsrc, 1, tmp1, i_src_size, 0), "luna_scale_i8i8o32");  // Q4->Q25
+            THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(tmp1, (1 << (LOG_Q_IN - x_scale)), tmp2, i_src_size, 0), "luna_scale_i32i32o32");  // Q4->Q25
+            THINKER_RET_CHECK(API_LIB(softmax_i32o32)((int32_t *)tmp1, (int32_t *)tmp2, i_src_size), "luna_softmax_i32o32");  // Q25->Q16.15
             vec_logn_32x32_sim((int32_t *)tmp2, (int32_t *)tmp1, i_src_size);  // Q16.15=>Q6.25
-            ret |= API_LIB(scale_i32i32o8)(tmp2, 1, ldst, i_src_size, (LOG_Q_OUT - y_scale));
+            THINKER_RET_CHECK(API_LIB(scale_i32i32o8)(tmp2, 1, ldst, i_src_size, (LOG_Q_OUT - y_scale)), "luna_scale_i32i32o8");
             
             if (output_is_psram) {
                 opi_psram_cpy_out(ldst_tmp, tmp1, i_src_size);
@@ -352,10 +349,10 @@ int32_t logsoftmaxint_luna(tTensor *data, tTensor *out, tTensor *Workspace, LogS
     } 
     else {
         THINKER_LOG_FATAL("LogSoftmaxInt support int8 data type only.");
-        ret = T_ERR_INVALID_DATATYPE;
+        return T_ERR_INVALID_DATATYPE;
     }
     
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif

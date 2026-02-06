@@ -28,13 +28,11 @@
 int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_List *list) {
     CHECK_EQ(num_tensor, (op->num_input_ + op->num_output_));  // Validate tensor count
     
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
-
 #if THINKER_USE_VENUS || THINKER_USE_ARCS || THINKER_USE_VENUSA
-    ret = requant_luna(tensors[0], tensors[op->num_input_]);  // Execute Requant operation
+    THINKER_RET_CHECK(requant_luna(tensors[0], tensors[op->num_input_]), "requant_luna");  // Execute Requant operation
 #endif
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #include "core/operator_template.h"

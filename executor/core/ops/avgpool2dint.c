@@ -32,8 +32,6 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     tTensor *X = ((tTensor **)tensors)[0];  // Input tensor
     tTensor *Y = ((tTensor **)tensors)[op->num_input_];  // Output tensor
     
-    int32_t ret = T_ERR_NO_IMPLEMENTED;  // Default error return
-    
     // Check if any platform is enabled
     #if THINKER_USE_VENUS || THINKER_USE_ARCS || THINKER_USE_VENUSA
         #if THINKER_PROFILE
@@ -43,7 +41,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
         // Check if workspace tensor is provided
         if (num_tensor > ((op->num_input_ + op->num_output_))) {
             tTensor *workspace = ((tTensor **)tensors)[num_tensor - 1];  // Workspace tensor
-            ret = avgpool2dint_luna(X, Y, workspace, attrs);  // Call platform-specific implementation
+            THINKER_RET_CHECK(avgpool2dint_luna(X, Y, workspace, attrs), "avgpool2dint_luna");  // Call platform-specific implementation
         }
         
         #if THINKER_PROFILE
@@ -53,7 +51,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
         #endif
     #endif
 
-    return ret;  // Return result code
+    return T_SUCCESS;  // Return result code
 }
 
 #include "core/operator_template.h"

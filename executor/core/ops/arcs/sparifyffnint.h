@@ -92,30 +92,28 @@ static int32_t luna_ffn_int_trans_dec(int8_t *p_input,  // (1,D)
         6. output = w1_mask * hidden_mask (Do, Dh/8)*(Dh/8, 1) => (Do, 1)  
     */  
     
-    int ret = T_ERR_NO_IMPLEMENTED;
     uint32_t shift_mask, shift_m0, shift_m1, dim_hidden_mask;
 
     int8_t *p_w_m0_mask, *p_w_m1_mask;
     int32_t *p_bias_m0_mask,*p_bias_m1_mask;
 
     if(1 != seq_len)
-        return ret;
+        return T_ERR_INVALID_PARA;
     if(dim_hidden%group_num !=0 )
-        return ret;
+        return T_ERR_INVALID_PARA;
 
     dim_hidden_mask = dim_hidden/group_num;
     shift_mask = q_input_mask+q_weight_mask-q_output_mask;
     shift_m0 = q_input_m0+q_weight_m0-q_output_m0;
     shift_m1 = q_input_m1+q_weight_m1-q_output_m1;
 
-    ret = T_SUCCESS;
     int8_t *p_mask = p_temp; p_temp += group_num*sizeof(int8_t);
     int8_t *p_hidden_mask = p_temp; p_temp += dim_hidden/group_num*sizeof(int8_t);
     int32_t *p_max_val_pos = (int32_t *)p_temp; p_temp += 2*sizeof(int32_t);
     
     if (group_num > 1) {
-        ret |= luna_split_mat_mul_bias_i8i8i32o8(p_weight_mask, p_input, p_bias_mask, p_mask, group_num, dim_in, 1, shift_mask); 
-        ret |= luna_max_i8o32(p_mask, p_max_val_pos, group_num);
+        THINKER_RET_CHECK(luna_split_mat_mul_bias_i8i8i32o8(p_weight_mask, p_input, p_bias_mask, p_mask, group_num, dim_in, 1, shift_mask), "luna_split_mat_mul_bias_i8i8i32o8");
+        THINKER_RET_CHECK(luna_max_i8o32(p_mask, p_max_val_pos, group_num), "luna_max_i8o32");
     } else {
         p_max_val_pos[1] = 0;
     }
@@ -134,19 +132,19 @@ static int32_t luna_ffn_int_trans_dec(int8_t *p_input,  // (1,D)
     p_bias_m1_mask = p_bias_m1;
 
     if (is_4bit_m0) {
-        ret |= luna_split_mat_mul_bias_i4i8i32o8(p_w_m0_mask, p_input, p_bias_m0_mask, p_hidden_mask, dim_hidden_mask, dim_in, 1, shift_m0); 
+        THINKER_RET_CHECK(luna_split_mat_mul_bias_i4i8i32o8(p_w_m0_mask, p_input, p_bias_m0_mask, p_hidden_mask, dim_hidden_mask, dim_in, 1, shift_m0), "luna_split_mat_mul_bias_i4i8i32o8");
     } else {
-        ret |= luna_split_mat_mul_bias_i8i8i32o8(p_w_m0_mask, p_input, p_bias_m0_mask, p_hidden_mask, dim_hidden_mask, dim_in, 1, shift_m0); 
+        THINKER_RET_CHECK(luna_split_mat_mul_bias_i8i8i32o8(p_w_m0_mask, p_input, p_bias_m0_mask, p_hidden_mask, dim_hidden_mask, dim_in, 1, shift_m0), "luna_split_mat_mul_bias_i8i8i32o8");
     }
 
-    ret |= luna_relu_i8o8(p_hidden_mask, p_hidden_mask, dim_hidden_mask, 0);
+    THINKER_RET_CHECK(luna_relu_i8o8(p_hidden_mask, p_hidden_mask, dim_hidden_mask, 0), "luna_relu_i8o8");
     if (is_4bit_m1) {
-        ret |= luna_split_mat_mul_bias_i4i8i32o8(p_w_m1_mask, p_hidden_mask, p_bias_m1_mask, p_output, dim_out, dim_hidden_mask, 1, shift_m1); 
+        THINKER_RET_CHECK(luna_split_mat_mul_bias_i4i8i32o8(p_w_m1_mask, p_hidden_mask, p_bias_m1_mask, p_output, dim_out, dim_hidden_mask, 1, shift_m1), "luna_split_mat_mul_bias_i4i8i32o8");
     } else {
-        ret |= luna_split_mat_mul_bias_i8i8i32o8(p_w_m1_mask, p_hidden_mask, p_bias_m1_mask, p_output, dim_out, dim_hidden_mask, 1, shift_m1); 
+        THINKER_RET_CHECK(luna_split_mat_mul_bias_i8i8i32o8(p_w_m1_mask, p_hidden_mask, p_bias_m1_mask, p_output, dim_out, dim_hidden_mask, 1, shift_m1), "luna_split_mat_mul_bias_i8i8i32o8");
     } 
 
-    return ret;
+    return T_SUCCESS;
 }
 
 /**
@@ -164,10 +162,7 @@ static int32_t luna_ffn_int_trans_dec(int8_t *p_input,  // (1,D)
  * @return Operation result status
  */
 int32_t sparifyffnint_luna(tTensor *X, tTensor *weight1, tTensor *bias1, tTensor *weight2, tTensor *bias2, 
-                          tTensor *weight3, tTensor *bias3, tTensor *workspace, tTensor *Y, SparifyFFNIntAttrs *attrs) 
-{
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
-
+                          tTensor *weight3, tTensor *bias3, tTensor *workspace, tTensor *Y, SparifyFFNIntAttrs *attrs) {
     int8_t *p_input       = (int8_t *)X->dptr_;
     int8_t *p_weight_m0   = (int8_t *)weight1->dptr_;
     int8_t *p_weight_m1   = (int8_t *)weight2->dptr_;
@@ -194,15 +189,17 @@ int32_t sparifyffnint_luna(tTensor *X, tTensor *weight1, tTensor *bias1, tTensor
     int32_t q_output_mask = attrs->mask_out_scale;
     
 #if (defined(WIN32) || defined(linux))
-    ret = luna_ffn_int_trans_dec(p_input, p_weight_m0, p_bias_m0, p_weight_m1, p_bias_m1, p_weight_mask, p_bias_mask,
+    THINKER_RET_CHECK(luna_ffn_int_trans_dec(p_input, p_weight_m0, p_bias_m0, p_weight_m1, p_bias_m1, p_weight_mask, p_bias_mask,
                                 p_output, p_temp, dim_in, dim_hidden, dim_out, seq_len, group_num, q_input_m0, q_weight_m0, 
-                                q_output_m0, q_input_m1, q_weight_m1, q_output_m1, q_input_mask, q_weight_mask, q_output_mask, 1, 1);
+                                q_output_m0, q_input_m1, q_weight_m1, q_output_m1, q_input_mask, q_weight_mask, q_output_mask, 1, 1),
+                                "luna_ffn_int_trans_dec");
 #else
-    ret = nlang_ffn_int_trans_dec(p_input, p_weight_m0, p_bias_m0, p_weight_m1, p_bias_m1, p_weight_mask, p_bias_mask,
+    THINKER_RET_CHECK(nlang_ffn_int_trans_dec(p_input, p_weight_m0, p_bias_m0, p_weight_m1, p_bias_m1, p_weight_mask, p_bias_mask,
                                 p_output, p_temp, dim_in, dim_hidden, dim_out, seq_len, group_num, q_input_m0, q_weight_m0, 
-                                q_output_m0, q_input_m1, q_weight_m1, q_output_m1, q_input_mask, q_weight_mask, q_output_mask, 1, 1);
+                                q_output_m0, q_input_m1, q_weight_m1, q_output_m1, q_input_mask, q_weight_mask, q_output_mask, 1, 1),
+                                "nlang_ffn_int_trans_dec");
 #endif
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif  //_FFNINT_LUNA_H_

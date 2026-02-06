@@ -26,7 +26,7 @@ int32_t split_venus(tTensor *X, tTensor **tensors, SliceAttrs *attrs) {
     }
     // Check if axis is valid
     if (attrs->axis >= X->shape_.ndim_) {
-        return -1;
+        return T_ERR_INVALID_PARA;
     }
 
     // Calculate leading, middle, and stride dimensions
@@ -53,7 +53,7 @@ int32_t split_venus(tTensor *X, tTensor **tensors, SliceAttrs *attrs) {
         offset += attrs->split[n];
     }
 
-    return 0;
+    return T_SUCCESS;
 }
 
 #if !(defined(WIN32) || defined(linux))

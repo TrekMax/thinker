@@ -22,9 +22,7 @@
  * @param Y Output tensor
  * @return int32_t Operation status
  */
-int32_t iqsub_luna(tTensor *X1, tTensor *X2, tTensor *Temp, tTensor *Y) 
-{
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
+int32_t iqsub_luna(tTensor *X1, tTensor *X2, tTensor *Temp, tTensor *Y) {
     int32_t x1_q = (int32_t)X1->scale_;
     int32_t x2_q = (int32_t)X2->scale_;
     int32_t y_q = (int32_t)Y->scale_;
@@ -34,7 +32,7 @@ int32_t iqsub_luna(tTensor *X1, tTensor *X2, tTensor *Temp, tTensor *Y)
     size_t size = getTensorSize(X1);
 
     if (x1_q < y_q || x2_q < y_q) {
-        return ret;
+        return T_ERR_INVALID_PARA;
     }
 
     bool x1_psram = (X1->mem_.type_ == 1 || X1->mem_.type_ == 3) && Temp;
@@ -49,21 +47,21 @@ int32_t iqsub_luna(tTensor *X1, tTensor *X2, tTensor *Temp, tTensor *Y)
             case Int8: {
                 if (x1_psram) {
                     src1 = (int8_t *)Temp->dptr_;
-                    ret = API_LIB(memcpy_i8o8)(src1, (void *)X1->dptr_, size * sizeof(int8_t));
+                    THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(src1, (void *)X1->dptr_, size * sizeof(int8_t)), "luna_memcpy_i8o8");
                 }
                 if (x1_q != y_q) {
-                    ret = API_LIB(scale_i8i8o8)((const int8_t *)src1, 1, (int8_t *)Temp->dptr_, size, shift1);
+                    THINKER_RET_CHECK(API_LIB(scale_i8i8o8)((const int8_t *)src1, 1, (int8_t *)Temp->dptr_, size, shift1), "luna_scale_i8o8");
                     src1 = (int8_t *)Temp->dptr_;
                 }
 
                 if (x2_psram) {
                     src2 = (int8_t *)Temp->dptr_ + (x1_psram || (x1_q != y_q)) * size;
-                    ret = API_LIB(memcpy_i8o8)(src2, (void *)X2->dptr_, size * sizeof(int8_t));
+                    THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(src2, (void *)X2->dptr_, size * sizeof(int8_t)), "luna_memcpy_i8o8");
                 }
                 if (x2_q != y_q) {
-                    ret = API_LIB(scale_i8i8o8)((const int8_t *)src2, 1, 
+                    THINKER_RET_CHECK(API_LIB(scale_i8i8o8)((const int8_t *)src2, 1, 
                                                (int8_t *)(Temp->dptr_ + (x1_psram || (x1_q != y_q)) * size), 
-                                               size, shift2);
+                                               size, shift2), "luna_scale_i8o8");
                     src2 = (int8_t *)Temp->dptr_ + (x1_psram || (x1_q != y_q)) * size;
                 }
 
@@ -71,18 +69,18 @@ int32_t iqsub_luna(tTensor *X1, tTensor *X2, tTensor *Temp, tTensor *Y)
                     dst = (int8_t *)Temp->dptr_;
                 }
 
-                ret = API_LIB(sub_i8i8o8)((const int8_t *)dst, (int8_t *)src2, (int8_t *)dst, size, 0);
+                THINKER_RET_CHECK(API_LIB(sub_i8i8o8)((const int8_t *)dst, (int8_t *)src2, (int8_t *)dst, size, 0), "luna_sub_i8i8o8");
 
                 if (y_psram) {
                     opi_psram_cpy_out((void *)Y->dptr_, dst, size * sizeof(int8_t));
                 }
             } break;
             default:
-                break;
+                return T_ERR_INVALID_DATATYPE;
         }
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif

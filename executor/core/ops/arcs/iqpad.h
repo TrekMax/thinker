@@ -27,10 +27,7 @@
  * @param attrs Padding attributes
  * @return int32_t Operation status
  */
-int32_t iqpad_luna(tTensor *X, tTensor *P, tTensor *data, tTensor *workspace, tTensor *Y, iqPadAttrs *attrs) 
-{
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
-
+int32_t iqpad_luna(tTensor *X, tTensor *P, tTensor *data, tTensor *workspace, tTensor *Y, iqPadAttrs *attrs) {
     if (X->shape_.ndim_ != 4) {
         printf("do not support this type!\n");
         return T_ERR_INVALID_DATA;
@@ -68,7 +65,7 @@ int32_t iqpad_luna(tTensor *X, tTensor *P, tTensor *data, tTensor *workspace, tT
         pads_w_right = *((int64_t *)P->dptr_ + 7);
     } else {
         printf("pads error!\n");
-        return -1;
+        return T_ERR_INVALID_PARA;
     }
 
     int8_t *src = (int8_t *)X->dptr_;
@@ -77,26 +74,26 @@ int32_t iqpad_luna(tTensor *X, tTensor *P, tTensor *data, tTensor *workspace, tT
 
     if (mode < 0 || mode > 2) {
         printf("do not support this mode!\n");
-        return -1;
+        return T_ERR_INVALID_PARA;
     }
 
     int8_t fill_data = *((int8_t *)data->dptr_);
     if (fill_data != 0) {
         printf("do not support!\n");
-        return -1;
+        return T_ERR_INVALID_DATA;
     }
 
     int8_t *temp = (int8_t *)workspace->dptr_;
-    ret = API_LIB(split_mat_trans_i8o8)(src, temp, c_in, h_in * w_in);
+    THINKER_RET_CHECK(API_LIB(split_mat_trans_i8o8)(src, temp, c_in, h_in * w_in), "luna_split_mat_trans_i8o8");
 
     switch (mode) {
         case 0: { // Constant padding
             if (Y->mem_.type_ == 2) {
-                ret = API_LIB(memset_i8o8)(dst, fill_data, out_size);
+                THINKER_RET_CHECK(API_LIB(memset_i8o8)(dst, fill_data, out_size), "luna_memset_i8o8");
                 for (int32_t i = 0; i < h_in; ++i) {
                     for (int32_t j = 0; j < w_in; ++j) {
-                        ret = API_LIB(memcpy_i8o8)(dst + ((i + pads_h_up) * w_out + j + pads_w_left) * c_in, 
-                                                  temp + (i * w_in + j) * c_in, c_in);
+                        THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(dst + ((i + pads_h_up) * w_out + j + pads_w_left) * c_in, 
+                                                  temp + (i * w_in + j) * c_in, c_in), "luna_memcpy_i8o8");
                     }
                 }
             } else {
@@ -114,13 +111,13 @@ int32_t iqpad_luna(tTensor *X, tTensor *P, tTensor *data, tTensor *workspace, tT
             if (Y->mem_.type_ == 2) {
                 for (int32_t i = 0; i < h_in; ++i) {
                     for (int32_t j = 0; j < w_in; ++j) {
-                        ret = API_LIB(memcpy_i8o8)(dst + ((i + pads_h_up) * w_out + j + pads_w_left) * c_in, 
-                                                  temp + (i * w_in + j) * c_in, c_in);
+                        THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(dst + ((i + pads_h_up) * w_out + j + pads_w_left) * c_in, 
+                                                  temp + (i * w_in + j) * c_in, c_in), "luna_memcpy_i8o8");
                     }
                 }
                 if (pads_h_up != 0) {
                     for (int32_t i = 0; i < pads_h_up; ++i) {
-                        ret = API_LIB(memcpy_i8o8)(dst + (i * w_out + pads_w_left) * c_in, temp, w_in * c_in);
+                        THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(dst + (i * w_out + pads_w_left) * c_in, temp, w_in * c_in), "luna_memcpy_i8o8");
                     }
                 }
                 if (pads_w_left != 0) {
@@ -134,9 +131,9 @@ int32_t iqpad_luna(tTensor *X, tTensor *P, tTensor *data, tTensor *workspace, tT
                 }
                 if (pads_h_down != 0) {
                     for (int32_t i = h_in + pads_h_up; i < h_out; ++i) {
-                        ret = API_LIB(memcpy_i8o8)(dst + i * w_out * c_in, 
+                        THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(dst + i * w_out * c_in, 
                                                   dst + (h_in + pads_h_up - 1) * w_out * c_in, 
-                                                  (w_in + pads_w_left) * c_in);
+                                                  (w_in + pads_w_left) * c_in), "luna_memcpy_i8o8");
                     }
                 }
             } else {
@@ -183,14 +180,14 @@ int32_t iqpad_luna(tTensor *X, tTensor *P, tTensor *data, tTensor *workspace, tT
             if (Y->mem_.type_ == 2) {
                 for (int32_t i = 0; i < h_in; ++i) {
                     for (int32_t j = 0; j < w_in; ++j) {
-                        ret = API_LIB(memcpy_i8o8)(dst + ((i + pads_h_up) * w_out + j + pads_w_left) * c_in, 
-                                                  temp + (i * w_in + j) * c_in, c_in);
+                        THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(dst + ((i + pads_h_up) * w_out + j + pads_w_left) * c_in, 
+                                                  temp + (i * w_in + j) * c_in, c_in), "luna_memcpy_i8o8");
                     }
                 }
                 if (pads_h_up != 0) {
                     for (int32_t i = 0; i < pads_h_up; ++i) {
-                        ret = API_LIB(memcpy_i8o8)(dst + (i * w_out + pads_w_left) * c_in, 
-                                                  temp + (pads_h_up - i) * w_in * c_in, w_in * c_in);
+                        THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(dst + (i * w_out + pads_w_left) * c_in, 
+                                                  temp + (pads_h_up - i) * w_in * c_in, w_in * c_in), "luna_memcpy_i8o8");
                     }
                 }
                 if (pads_w_left != 0) {
@@ -204,9 +201,9 @@ int32_t iqpad_luna(tTensor *X, tTensor *P, tTensor *data, tTensor *workspace, tT
                 }
                 if (pads_h_down != 0) {
                     for (int32_t i = h_in + pads_h_up; i < h_out; ++i) {
-                        ret = API_LIB(memcpy_i8o8)(dst + i * w_out * c_in, 
+                        THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(dst + i * w_out * c_in, 
                                                   dst + (2 * (h_in + pads_h_up) - i - 2) * w_out * c_in, 
-                                                  (w_in + pads_w_left) * c_in);
+                                                  (w_in + pads_w_left) * c_in), "luna_memcpy_i8o8");
                     }
                 }
             } else {
@@ -261,8 +258,7 @@ int32_t iqpad_luna(tTensor *X, tTensor *P, tTensor *data, tTensor *workspace, tT
             break;
     }
 
-    ret = API_LIB(split_mat_trans_i8o8)(dst, dst, h_out * w_out, c_out);
-    return ret;
+    return API_LIB(split_mat_trans_i8o8)(dst, dst, h_out * w_out, c_out);
 }
 
 #endif

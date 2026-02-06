@@ -56,6 +56,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     }
 
     // Process data based on data type
+#if THINKER_USE_VENUS
     DATA_TYPE_SWITCH_ALL(X->dtype_, Type, {
         const Type *input = (Type *)X->dptr_;
         Type *output = (Type *)Y->dptr_;
@@ -83,13 +84,43 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
         }
         
         // Copy expanded regions
-        for (int32_t i = 1; i < leading; ++i)
-#if THINKER_USE_VENUS
+        for (int32_t i = 1; i < leading; ++i) {
             memcpy(output + i * size * sizeof(Type), output, size * sizeof(Type));
-#elif THINKER_USE_ARCS || THINKER_USE_VENUSA
-            opi_psram_cpy_out(output + i * size * sizeof(Type), output, size * sizeof(Type));
-#endif
+        }
     });
+#elif THINKER_USE_ARCS || THINKER_USE_VENUSA
+    DATA_TYPE_SWITCH_ALL(X->dtype_, Type, {
+        const Type *input = (Type *)X->dptr_;
+        Type *output = (Type *)Y->dptr_;
+        int32_t ndim = xdim;
+        int32_t input_accumu[7];
+        int32_t output_accumu[7];
+        
+        // Calculate accumulation factors for indexing
+        input_accumu[ndim - 1] = output_accumu[ndim - 1] = 1;
+        for (int32_t i = ndim - 1; i > 0; i--) {
+            input_accumu[i - 1] = input_accumu[i] * tShape[i];
+            output_accumu[i - 1] = output_accumu[i] * expandshape[i];
+        }
+        
+        // Copy data element by element
+        for (int32_t i = 0; i < size; ++i) {
+            int32_t inputIdx = 0;
+            int32_t i_ = i;
+            for (int32_t j = 0; j < ndim; ++j) {
+                int32_t outIdx = i_ / output_accumu[j];
+                inputIdx += (outIdx % tShape[j]) * input_accumu[j];
+                i_ %= output_accumu[j];
+            }
+            output[i] = input[inputIdx];
+        }
+        
+        // Copy expanded regions
+        for (int32_t i = 1; i < leading; ++i) {
+            opi_psram_cpy_out(output + i * size * sizeof(Type), output, size * sizeof(Type));
+        }
+    });
+#endif
 
     return T_SUCCESS;
 }

@@ -23,7 +23,6 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     
     // Get attention attributes
     MultiheadAttentionAttrs *attrs = (MultiheadAttentionAttrs *)((int8_t *)op + op->attr_offset_);
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
     
     // Get input, weights, biases, embeddings, output, and workspace tensors
     tTensor *input = tensors[0];
@@ -51,8 +50,8 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     }
     
     // Call hardware-specific multi-head attention implementation
-    ret = multiheadattention_luna(input, weight_q, bias_q, weight_k, bias_k, weight_v, bias_v,
-                                 weight_p, bias_p, emb_keys, emb_values, output, workspace, attrs);
+    THINKER_RET_CHECK(multiheadattention_luna(input, weight_q, bias_q, weight_k, bias_k, weight_v, bias_v,
+                                 weight_p, bias_p, emb_keys, emb_values, output, workspace, attrs), "multiheadattention_luna");
 
 #if THINKER_PROFILE
     uint64_t finish_t = tick_count();
@@ -61,7 +60,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
 #endif
 #endif
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #include "core/operator_template.h"

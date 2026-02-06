@@ -39,7 +39,6 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     tTensor *X = ((tTensor **)tensors)[0];
     tTensor *Y = ((tTensor **)tensors)[op->num_input_];
     tTensor *Temp = ((tTensor **)tensors)[op->num_input_ + 1];
-    int32_t ret = T_SUCCESS;
     
 #if THINKER_USE_VENUS || THINKER_USE_ARCS || THINKER_USE_VENUSA
 #if THINKER_PROFILE
@@ -47,7 +46,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
 #endif
 
     // Call hardware-specific max pooling implementation
-    ret = maxpool_luna(X, Y, Temp, attrs);
+    THINKER_RET_CHECK(maxpool_luna(X, Y, Temp, attrs), "maxpool_luna");
 
 #if THINKER_PROFILE
     uint64_t finish_t = tick_count();
@@ -56,7 +55,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
 #endif
 #endif
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #include "core/operator_template.h"

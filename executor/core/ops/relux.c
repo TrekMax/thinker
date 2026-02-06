@@ -21,14 +21,13 @@
 int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_List *list) {
     CHECK_EQ(num_tensor, (op->num_input_ + op->num_output_));  // Validate tensor count
     
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
     ReluxAttrs *attrs = (ReluxAttrs *)((int8_t *)op + op->attr_offset_);
 
 #if THINKER_USE_VENUSA
 #if THINKER_PROFILE
     uint64_t start_t = tick_count();  // Start profiling
 #endif
-    ret = relux_luna(tensors[0], tensors[op->num_input_], attrs);  // Execute ReluX operation
+    THINKER_RET_CHECK(relux_luna(tensors[0], tensors[op->num_input_], attrs), "relux_luna");  // Execute ReluX operation
     
 #if THINKER_PROFILE
     uint64_t finish_t = tick_count();
@@ -37,7 +36,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
 #endif
 #endif
 
-    return 0;
+    return T_SUCCESS;
 }
 
 #include "core/operator_template.h"

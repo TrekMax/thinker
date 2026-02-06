@@ -96,10 +96,8 @@ static int32_t luna_ceil(int32_t x, int32_t shift) {
  * @return Operation status
  */
 int32_t bmmint_luna(tTensor *lhs, tTensor *rhs, tTensor *out, tTensor *workspace) {
-    int32_t ret = T_ERR_FAIL;
-
     if ((lhs->shape_.ndim_ != rhs->shape_.ndim_) || (lhs->dtype_ != rhs->dtype_)) {
-        return ret;
+        return T_ERR_INVALID_PARA;
     }
 
     const int32_t left_limit = 64 * 1024;
@@ -134,11 +132,11 @@ int32_t bmmint_luna(tTensor *lhs, tTensor *rhs, tTensor *out, tTensor *workspace
     int32_t shift = q_l + q_r - q_o;
 
     if ((shift < 0) || (n_dim < 2) || (n_dim > 3)) {
-        return ret;
+        return T_ERR_INVALID_PARA;
     }
 
     if ((0 != in_idx) || (0 != ou_idx)) {
-        return ret;
+        return T_ERR_INVALID_PARA;
     }
 
     if (3 == n_dim) {
@@ -219,10 +217,10 @@ int32_t bmmint_luna(tTensor *lhs, tTensor *rhs, tTensor *out, tTensor *workspace
                         if (tmp_size > workspace_size) {
                             return -1;
                         }
-                        ret = luna_mat_mul_api(p_tmp_src1, p_tmp_src2, p_tmp_dst, split_M, N, L, shift);
+                        THINKER_RET_CHECK(luna_mat_mul_api(p_tmp_src1, p_tmp_src2, p_tmp_dst, split_M, N, L, shift), "luna_mat_maul_api");
                         memcpy((int8_t *)tdst + ou_oft, p_tmp_dst, split_out_size);
                     } else {
-                        ret = luna_mat_mul_api(p_tmp_src1, p_tmp_src2, p_tmp_dst, split_M, N, L, shift);
+                        THINKER_RET_CHECK(luna_mat_mul_api(p_tmp_src1, p_tmp_src2, p_tmp_dst, split_M, N, L, shift), "luna_mat_mul_api");
                     }
                 }
             } else {
@@ -262,12 +260,12 @@ int32_t bmmint_luna(tTensor *lhs, tTensor *rhs, tTensor *out, tTensor *workspace
                         p_tmp_dst = (int8_t *)tmp_buf + tmp_size;
                         tmp_size += split_out_size;
                         if (tmp_size > workspace_size) {
-                            return -1;
+                            return T_ERR_NO_WORKSPACE;
                         }
-                        ret = luna_mat_mul_api(p_tmp_src1, p_tmp_src2, p_tmp_dst, split_num, split_M, N, L, shift);
+                        THINKER_RET_CHECK(luna_mat_mul_api(p_tmp_src1, p_tmp_src2, p_tmp_dst, split_num, split_M, N, L, shift), "luna_mat_mul_api");
                         memcpy((int8_t *)tdst + ou_oft, p_tmp_dst, split_out_size);
                     } else {
-                        ret = luna_mat_mul_api(p_tmp_src1, p_tmp_src2, p_tmp_dst, split_num, split_M, N, L, shift);
+                        THINKER_RET_CHECK(luna_mat_mul_api(p_tmp_src1, p_tmp_src2, p_tmp_dst, split_num, split_M, N, L, shift), "luna_mat_mul_api");
                     }
                 }
             }
@@ -287,14 +285,14 @@ int32_t bmmint_luna(tTensor *lhs, tTensor *rhs, tTensor *out, tTensor *workspace
                 tmp_size += M * L;
                 if (tmp_size > workspace_size) {
                     printf("workspace exceed!\n");
-                    return -1;
+                    return T_ERR_NO_WORKSPACE;
                 }
             }
 
             if (int8_condition_r <= right_limit) {
                 BMM_MAT_MUL_LUNA_API luna_mat_mul_api =
                     (BMM_MAT_MUL_LUNA_API)luna_bmm_api_list[in_idx][ou_idx].luna_api;
-                ret = luna_mat_mul_api(p_tmp_src1, p_tmp_src2, p_tmp_dst, M, N, L, shift);
+                THINKER_RET_CHECK(luna_mat_mul_api(p_tmp_src1, p_tmp_src2, p_tmp_dst, M, N, L, shift), "luna_mat_mul_api");
             } else {
                 int32_t split_num = 2;
                 int32_t split_L = L / split_num;
@@ -308,7 +306,7 @@ int32_t bmmint_luna(tTensor *lhs, tTensor *rhs, tTensor *out, tTensor *workspace
 
                 BMM_SPLIT_MAT_MUL_LUNA_API luna_mat_mul_api =
                     (BMM_SPLIT_MAT_MUL_LUNA_API)luna_bmm_api_list[in_idx + 3][ou_idx].luna_api;
-                ret = luna_mat_mul_api(p_tmp_src1, p_tmp_src2, p_tmp_dst, split_num, M, N, L, shift);
+                THINKER_RET_CHECK(luna_mat_mul_api(p_tmp_src1, p_tmp_src2, p_tmp_dst, split_num, M, N, L, shift), "luna_mat_mul_api");
             }
 
             if (out_is_psram) {
@@ -317,7 +315,7 @@ int32_t bmmint_luna(tTensor *lhs, tTensor *rhs, tTensor *out, tTensor *workspace
         }
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif  //_BMMINT_VENUS_H_

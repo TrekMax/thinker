@@ -271,6 +271,7 @@ int32_t luna_execute_cmd_hook_for_build_list(const uint32_t *api, void* param, u
 #endif
 
 #ifdef WIN32
+#include <time.h>
 double tick_count(void) {
     struct timespec tv;
     timespec_get(&tv, 1);

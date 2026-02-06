@@ -97,9 +97,7 @@ static void conv1dint_para_init(Conv1dIntAttrs *attrs, conv_struct_t *conv_attrs
  * @param attrs Convolution attributes
  * @return int32_t Operation status
  */
-int32_t conv1dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y, tTensor *Temp, Conv1dIntAttrs *attrs) {
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
-    
+int32_t conv1dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y, tTensor *Temp, Conv1dIntAttrs *attrs) {   
     // Data pointers
     int8_t *src = (int8_t *)(X->dptr_);
     int8_t *weight = (int8_t *)(W->dptr_);
@@ -130,47 +128,47 @@ int32_t conv1dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y, tTenso
     
     // Process based on group configuration
     if (group == 1) {
-        ret = luna_split_conv_para_pack(&conv_attrs, &conv_static_para, LUNA_CONV1D);
+        THINKER_RET_CHECK(luna_split_conv_para_pack(&conv_attrs, &conv_static_para, LUNA_CONV1D), "luna_split_conv_para_pack");
         
         if (Y->dtype_ == Int8) {
             int8_t *dst = (int8_t *)(Y->dptr_);
             if (W->dtype_ == Int4) {
-                ret |= API_LIB(conv1d_i8i4o8)(src, weight, bias, dst, &conv_static_para);
+                THINKER_RET_CHECK(API_LIB(conv1d_i8i4o8)(src, weight, bias, dst, &conv_static_para), "luna_conv1d_i8i4o8");
             } else if (W->dtype_ == Int8) {
-                ret |= API_LIB(conv1d_i8i8o8)(src, weight, bias, dst, &conv_static_para);
+                THINKER_RET_CHECK(API_LIB(conv1d_i8i8o8)(src, weight, bias, dst, &conv_static_para), "luna_conv1d_i8i8o8");
             }
         } else if (Y->dtype_ == Int32) {
             int32_t *dst = (int32_t *)(Y->dptr_);
             int32_t size = getShapeSize(&(Y->shape_));
             if (W->dtype_ == Int4) {
-                ret |= API_LIB(conv1d_i8i4o32)(src, weight, bias, dst, &conv_static_para);
+                THINKER_RET_CHECK(API_LIB(conv1d_i8i4o32)(src, weight, bias, dst, &conv_static_para), "luna_conv1d_i8i4o32");
             } else if (W->dtype_ == Int8) {
-                ret |= API_LIB(conv1d_i8i8o32)(src, weight, bias, dst, &conv_static_para);
+                THINKER_RET_CHECK(API_LIB(conv1d_i8i8o32)(src, weight, bias, dst, &conv_static_para), "luna_conv1d_i8i8o32");
             }
             if (shift != 0) {
-                ret |= API_LIB(scale_i32i32o32)(dst, 1UL << shift, dst, size, 0);
+                THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(dst, 1UL << shift, dst, size, 0), "luna_scale_i32i32o32");
             }
         }
     } else if (group == input_c && group == output_c) { // Depthwise convolution
-        ret = luna_split_conv_para_pack(&conv_attrs, &conv_static_para, LUNA_DEPTHWISE1D);
+        THINKER_RET_CHECK(luna_split_conv_para_pack(&conv_attrs, &conv_static_para, LUNA_DEPTHWISE1D), "luna_split_conv_para_pack");
         
         if (Y->dtype_ == Int8) {
             int8_t *dst = (int8_t *)(Y->dptr_);
             if (W->dtype_ == Int4) {
-                ret |= API_LIB(depthwise1d_i8i4o8)(src, weight, bias, dst, &conv_static_para);
+                THINKER_RET_CHECK(API_LIB(depthwise1d_i8i4o8)(src, weight, bias, dst, &conv_static_para), "luna_depthwise1d_i8i4o8");
             } else if (W->dtype_ == Int8) {
-                ret |= API_LIB(depthwise1d_i8i8o8)(src, weight, bias, dst, &conv_static_para);
+                THINKER_RET_CHECK(API_LIB(depthwise1d_i8i8o8)(src, weight, bias, dst, &conv_static_para), "luna_depthwise1d_i8i8o8");
             }
         } else if (Y->dtype_ == Int32) {
             int32_t *dst = (int32_t *)(Y->dptr_);
             int32_t size = getShapeSize(&(Y->shape_));
             if (W->dtype_ == Int4) {
-                ret |= API_LIB(depthwise1d_i8i4o32)(src, weight, bias, dst, &conv_static_para);
+                THINKER_RET_CHECK(API_LIB(depthwise1d_i8i4o32)(src, weight, bias, dst, &conv_static_para), "luna_depthwise1d_i8i4o32");
             } else if (W->dtype_ == Int8) {
-                ret |= API_LIB(depthwise1d_i8i8o32)(src, weight, bias, dst, &conv_static_para);
+                THINKER_RET_CHECK(API_LIB(depthwise1d_i8i8o32)(src, weight, bias, dst, &conv_static_para), "luna_depthwise1d_i8i8o32");
             }
             if (shift != 0) {
-                ret |= API_LIB(scale_i32i32o32)(dst, 1UL << shift, dst, size, 0);
+                THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(dst, 1UL << shift, dst, size, 0), "luna_scale_i32i32o32");
             }
         }
     } else {
@@ -178,7 +176,7 @@ int32_t conv1dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y, tTenso
         return T_ERR_INVALID_PARA;
     }
     
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif  //_CONV1DINT_ARCS_H_

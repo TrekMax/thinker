@@ -35,18 +35,12 @@ static luna_vec_scale_api_item luna_vec_scale_api_items[][2] = {
  * @return int32_t Operation status
  */
 static int32_t calc_vec_div_luna(tTensor *lhs, tTensor *rhs, tTensor *Y, int32_t size) {
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
-
-    switch (lhs->dtype_) {
-        case Int32:
-            ret = API_LIB(div_i32i32o32)((const int32_t *)lhs->dptr_, (const int32_t *)rhs->dptr_, (int32_t *)Y->dptr_, size, 0);
-            break;
-        default:
-            printf("Data type not supported!");
-            break;
+    if (lhs->dtype_ == Int32) {
+            return API_LIB(div_i32i32o32)((const int32_t *)lhs->dptr_, (const int32_t *)rhs->dptr_, (int32_t *)Y->dptr_, size, 0);
     }
-
-    return ret;
+    else {
+        return T_ERR_INVALID_DATATYPE;
+    }
 }
 
 /**
@@ -59,8 +53,6 @@ static int32_t calc_vec_div_luna(tTensor *lhs, tTensor *rhs, tTensor *Y, int32_t
  * @return int32_t Operation status
  */
 static int32_t calc_vec_rscale_luna(tTensor *lhs, int32_t scalar, tTensor *Y, int32_t size, int32_t shift) {
-    int32_t ret = T_ERR_FAIL;
-
     int32_t rshift = log2f(scalar);
     int32_t lshift = shift - rshift;
     int32_t in_idx = (lhs->dtype_ & 0xF) >> 1;
@@ -68,12 +60,12 @@ static int32_t calc_vec_rscale_luna(tTensor *lhs, int32_t scalar, tTensor *Y, in
     luna_vec_scale_api luna_vec_api = (luna_vec_scale_api)luna_vec_scale_api_items[in_idx][ou_idx];
 
     if (lshift < 0) {
-        ret = luna_vec_api((void *)lhs->dptr_, 1, (void *)Y->dptr_, size, -lshift);
+        THINKER_RET_CHECK(luna_vec_api((void *)lhs->dptr_, 1, (void *)Y->dptr_, size, -lshift), "luna_vec_api");
     } else if (lshift > 0) {
-        ret = luna_vec_api((void *)lhs->dptr_, (1 << lshift), (void *)Y->dptr_, size, 0);
+        THINKER_RET_CHECK(luna_vec_api((void *)lhs->dptr_, (1 << lshift), (void *)Y->dptr_, size, 0), "luna_vec_api");
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 /**
@@ -84,7 +76,6 @@ static int32_t calc_vec_rscale_luna(tTensor *lhs, int32_t scalar, tTensor *Y, in
  * @return int32_t Operation status
  */
 int32_t iqdiv_luna(tTensor *lhs, tTensor *rhs, tTensor *Y) {
-    int32_t ret = T_ERR_FAIL;
     size_t size = getTensorSize(lhs);
 
     // Calculate quantization shift
@@ -104,12 +95,12 @@ int32_t iqdiv_luna(tTensor *lhs, tTensor *rhs, tTensor *Y) {
           scalar = (int32_t)(*(int32_t *)rhs->dptr_);
         }
 
-        ret = calc_vec_rscale_luna(lhs, scalar, Y, size, shift);
+        THINKER_RET_CHECK(calc_vec_rscale_luna(lhs, scalar, Y, size, shift), "calc_vec_rscale_luna");
     } else {
-        ret = calc_vec_div_luna(lhs, rhs, Y, size);
+        THINKER_RET_CHECK(calc_vec_div_luna(lhs, rhs, Y, size), "calc_vec_div_luna");
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif  // _DIV_LUNA_H_

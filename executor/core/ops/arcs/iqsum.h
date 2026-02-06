@@ -23,9 +23,7 @@
  * @param attrs Sum attributes
  * @return int32_t Operation status
  */
-int32_t iqsum_luna(tTensor *input, tTensor *Temp, tTensor *output, iqSumAttrs *attrs) 
-{
-    int32_t ret = T_SUCCESS;
+int32_t iqsum_luna(tTensor *input, tTensor *Temp, tTensor *output, iqSumAttrs *attrs) {
     int32_t axis = attrs->axis;
     size_t size = getTensorSize(input);
 
@@ -40,17 +38,17 @@ int32_t iqsum_luna(tTensor *input, tTensor *Temp, tTensor *output, iqSumAttrs *a
     int32_t shift = input->scale_ - output->scale_;
 
     for (int32_t i = 0; i < len; ++i) {
-        ret |= API_LIB(vector_sum_i8o32)((const int8_t *)input->dptr_, 
+        THINKER_RET_CHECK(API_LIB(vector_sum_i8o32)((const int8_t *)input->dptr_, 
                                        (int32_t *)Temp->dptr_, 
-                                       input->shape_.dims_[axis], shift);
+                                       input->shape_.dims_[axis], shift), "luna_vector_sum_i8o32");
     }
 
-    ret |= API_LIB(scale_i32i32o8)((const int32_t *)Temp->dptr_, 
+    THINKER_RET_CHECK(API_LIB(scale_i32i32o8)((const int32_t *)Temp->dptr_, 
                                    1, 
                                    (int8_t *)output->dptr_, 
-                                   size, 0);
+                                   size, 0), "luna_scale_i32i32o8");
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif

@@ -49,15 +49,14 @@ static struct luna_vec_mul_item luna_vec_api_list[][3] = {
  * @return int32_t Operation status
  */
 int32_t calc_vec_mul_luna(tTensor *lhs, tTensor *rhs, tTensor *Y, int32_t size, int32_t shift) {
-    int32_t ret = T_ERR_FAIL;
     int32_t in_idx = (lhs->dtype_ & 0xF) >> 1;
     int32_t ou_idx = (Y->dtype_ & 0xF) >> 1;
     VEC_MUL_LUNA_API luna_vec_api = (VEC_MUL_LUNA_API)luna_vec_api_list[in_idx][ou_idx].luna_api;
     void *src1  = (void *)lhs->dptr_;
     void *src2  = (void *)rhs->dptr_;
     void *dst   = (void *)Y->dptr_;
-    ret = luna_vec_api(src1, src2, dst, size, shift);
-    return ret;
+    THINKER_RET_CHECK(luna_vec_api(src1, src2, dst, size, shift), "luna_vec_api");
+    return T_SUCCESS;
 }
 
 /**
@@ -70,14 +69,13 @@ int32_t calc_vec_mul_luna(tTensor *lhs, tTensor *rhs, tTensor *Y, int32_t size, 
  * @return int32_t Operation status
  */
 int32_t calc_vec_scale_luna(tTensor *lhs, int32_t scalar, tTensor *Y, int32_t size, int32_t shift) {
-    int32_t ret = T_ERR_FAIL;
     int32_t in_idx = ((lhs->dtype_ & 0xF) >> 1) + 3;
     int32_t ou_idx = (Y->dtype_ & 0xF) >> 1;
     VEC_SCALE_LUNA_API luna_vec_api = (VEC_SCALE_LUNA_API)luna_vec_api_list[in_idx][ou_idx].luna_api;
     void *src = (void *)lhs->dptr_;
     void *dst = (void *)Y->dptr_;
-    ret = luna_vec_api(src, scalar, dst, size, shift);
-    return ret;
+    THINKER_RET_CHECK(luna_vec_api(src, scalar, dst, size, shift), "luna_vec_api");
+    return T_SUCCESS;
 }
 
 /**
@@ -90,18 +88,17 @@ int32_t calc_vec_scale_luna(tTensor *lhs, int32_t scalar, tTensor *Y, int32_t si
  * @return int32_t Operation status
  */
 int32_t calc_vec_mul_luna_b2b2_broadcast_h1w1(tTensor *lhs, tTensor *rhs, tTensor *Y, tTensor *Temp, int32_t shift) {
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
     int32_t c = lhs->shape_.dims_[1];
     int32_t h = lhs->shape_.dims_[2];
     int32_t w = lhs->shape_.dims_[3];
     int8_t *p_tmp1 = (int8_t *)Temp->dptr_;
     int8_t *p_tmp2 = p_tmp1 + c;
 
-    ret = API_LIB(memset_i8o8)(p_tmp1, 1, h * w);
-    ret |= API_LIB(mat_mul_i8i8o8)((int8_t *)rhs->dptr_, p_tmp1, p_tmp2, c, 1, h * w, 0);
-    ret |= API_LIB(mul_i8i8o8)((int8_t *)lhs->dptr_, p_tmp2, (int8_t *)Y->dptr_, c * h * w, shift);
+    THINKER_RET_CHECK(API_LIB(memset_i8o8)(p_tmp1, 1, h * w), "luna_memset_i8o8");
+    THINKER_RET_CHECK(API_LIB(mat_mul_i8i8o8)((int8_t *)rhs->dptr_, p_tmp1, p_tmp2, c, 1, h * w, 0), "luna_mul_i8i8o8");
+    THINKER_RET_CHECK(API_LIB(mul_i8i8o8)((int8_t *)lhs->dptr_, p_tmp2, (int8_t *)Y->dptr_, c * h * w, shift), "luna_mul_i8i8o8");
 
-    return ret;
+    return T_SUCCESS;
 }
 
 /**
@@ -114,8 +111,6 @@ int32_t calc_vec_mul_luna_b2b2_broadcast_h1w1(tTensor *lhs, tTensor *rhs, tTenso
  * @return int32_t Operation status
  */
 int32_t iqmul_luna(tTensor *lhs, tTensor *rhs, tTensor *Y, tTensor *Temp, iqBinaryAttrs *attrs) {
-    int32_t ret = T_ERR_FAIL;
-
     if (lhs->dtype_ == Int8 && rhs->dtype_ == Int32) {
         return T_ERR_INVALID_DATATYPE;
     }
@@ -127,13 +122,13 @@ int32_t iqmul_luna(tTensor *lhs, tTensor *rhs, tTensor *Y, tTensor *Temp, iqBina
     size_t size = getTensorSize(lhs);
 
     if (shift < 0) {
-        return ret;
+        return T_ERR_INVALID_PARA;
     }
 
     if (lhs->shape_.ndim_ == 4 && rhs->shape_.ndim_ == 4 &&
         lhs->shape_.dims_[1] == rhs->shape_.dims_[1] &&
         rhs->shape_.dims_[2] == 1 && rhs->shape_.dims_[3] == 1) {
-        ret = calc_vec_mul_luna_b2b2_broadcast_h1w1(lhs, rhs, Y, Temp, shift);
+        THINKER_RET_CHECK(calc_vec_mul_luna_b2b2_broadcast_h1w1(lhs, rhs, Y, Temp, shift), "calc_vec_mul_luna_b2b2_broadcast_h1w1");
     } else if (rhs->shape_.ndim_ == 0) {
         int32_t scalar = *(int32_t *)rhs->dptr_;
         if (rhs->dtype_ == Int8) {
@@ -145,12 +140,12 @@ int32_t iqmul_luna(tTensor *lhs, tTensor *rhs, tTensor *Y, tTensor *Temp, iqBina
         } else {
             return T_ERR_INVALID_DATATYPE;
         }
-        ret = calc_vec_scale_luna(lhs, scalar, Y, size, shift);
+        THINKER_RET_CHECK(calc_vec_scale_luna(lhs, scalar, Y, size, shift), "calc_vec_scale_luna");
     } else {
-        ret = calc_vec_mul_luna(lhs, rhs, Y, size, shift);
+        THINKER_RET_CHECK(calc_vec_mul_luna(lhs, rhs, Y, size, shift), "calc_vec_mul_luna");
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif  // _MUL_LUNA_H_

@@ -23,7 +23,6 @@
  * @return int32_t Operation status
  */
 int32_t iqsum_luna(tTensor *input, tTensor *Temp, tTensor *output, iqSumAttrs *attrs) {
-    int32_t ret = T_SUCCESS;
     int32_t axis = attrs->axis;
     size_t size = getTensorSize(input);
 
@@ -47,23 +46,23 @@ int32_t iqsum_luna(tTensor *input, tTensor *Temp, tTensor *output, iqSumAttrs *a
             switch (output->dtype_) {
                 case Int8:
                     for (int32_t i = 0; i < len; i++) {
-                        ret |= API_LIB(vector_sum_i8o8)((const int8_t *)input->dptr_, 
+                        THINKER_RET_CHECK(API_LIB(vector_sum_i8o8)((const int8_t *)input->dptr_, 
                                                         (int8_t *)output->dptr_, 
-                                                        input->shape_.dims_[axis], shift);
+                                                        input->shape_.dims_[axis], shift), "luna_vector_sum_i8o8");
                     }
                     break;
                 case Int16:
                     for (int32_t i = 0; i < len; i++) {
-                        ret |= API_LIB(vector_sum_i8o16)((const int8_t *)input->dptr_, 
+                        THINKER_RET_CHECK(API_LIB(vector_sum_i8o16)((const int8_t *)input->dptr_, 
                                                          (int16_t *)output->dptr_, 
-                                                         input->shape_.dims_[axis], shift);
+                                                         input->shape_.dims_[axis], shift), "luna_vector_sum_i8o16");
                     }
                     break;
                 case Int32:
                     for (int32_t i = 0; i < len; i++) {
-                        ret |= API_LIB(vector_sum_i8o32)((const int8_t *)input->dptr_, 
+                        THINKER_RET_CHECK(API_LIB(vector_sum_i8o32)((const int8_t *)input->dptr_, 
                                                          (int32_t *)output->dptr_, 
-                                                         input->shape_.dims_[axis], shift);
+                                                         input->shape_.dims_[axis], shift), "luna_vector_sum_i8o32");
                     }
                     break;
                 default:
@@ -74,23 +73,23 @@ int32_t iqsum_luna(tTensor *input, tTensor *Temp, tTensor *output, iqSumAttrs *a
             switch (output->dtype_) {
                 case Int8:
                     for (int32_t i = 0; i < len; i++) {
-                        ret |= API_LIB(vector_sum_i16o8)((const int16_t *)input->dptr_, 
+                        THINKER_RET_CHECK(API_LIB(vector_sum_i16o8)((const int16_t *)input->dptr_, 
                                                         (int8_t *)output->dptr_, 
-                                                        input->shape_.dims_[axis], shift);
+                                                        input->shape_.dims_[axis], shift), "luna_vector_sum_i16o8");
                     }
                     break;
                 case Int16:
                     for (int32_t i = 0; i < len; i++) {
-                        ret |= API_LIB(vector_sum_i16o16)((const int16_t *)input->dptr_, 
+                        THINKER_RET_CHECK(API_LIB(vector_sum_i16o16)((const int16_t *)input->dptr_, 
                                                          (int16_t *)output->dptr_, 
-                                                         input->shape_.dims_[axis], shift);
+                                                         input->shape_.dims_[axis], shift), "luna_vector_sum_i16o16");
                     }
                     break;
                 case Int32:
                     for (int32_t i = 0; i < len; i++) {
-                        ret |= API_LIB(vector_sum_i16o32)((const int16_t *)input->dptr_, 
+                        THINKER_RET_CHECK(API_LIB(vector_sum_i16o32)((const int16_t *)input->dptr_, 
                                                          (int32_t *)output->dptr_, 
-                                                         input->shape_.dims_[axis], shift);
+                                                         input->shape_.dims_[axis], shift), "luna_vector_sum_i16o32");
                     }
                     break;
                 default:
@@ -101,30 +100,30 @@ int32_t iqsum_luna(tTensor *input, tTensor *Temp, tTensor *output, iqSumAttrs *a
             switch (output->dtype_) {
                 case Int8:
                     for (int32_t i = 0; i < len; i++) {
-                        ret |= API_LIB(vector_sum_i32o8)((const int32_t *)input->dptr_, 
+                        THINKER_RET_CHECK(API_LIB(vector_sum_i32o8)((const int32_t *)input->dptr_, 
                                                         (int8_t *)output->dptr_, 
-                                                        input->shape_.dims_[axis], shift);
+                                                        input->shape_.dims_[axis], shift), "luna_vector_sum_i32o8");
                     }
                     break;
                 case Int16:
                     for (int32_t i = 0; i < len; i++) {
-                        ret |= API_LIB(vector_sum_i32o16)((const int32_t *)input->dptr_, 
+                        THINKER_RET_CHECK(API_LIB(vector_sum_i32o16)((const int32_t *)input->dptr_, 
                                                          (int16_t *)output->dptr_, 
-                                                         input->shape_.dims_[axis], shift);
+                                                         input->shape_.dims_[axis], shift), "luna_vector_sum_i32o16");
                     }
                     break;
                 case Int32:
                     for (int32_t i = 0; i < len; i++) {
-                        ret |= API_LIB(vector_sum_i32o32)((const int32_t *)input->dptr_, 
+                        THINKER_RET_CHECK(API_LIB(vector_sum_i32o32)((const int32_t *)input->dptr_, 
                                                          (int32_t *)output->dptr_, 
-                                                         input->shape_.dims_[axis], shift);
+                                                         input->shape_.dims_[axis], shift), "luna_vector_sum_i32o32");
                     }
                     break;
                 case Int64:
                     for (int32_t i = 0; i < len; i++) {
-                        ret |= API_LIB(vector_sum_i32o64)((const int32_t *)input->dptr_, 
+                        THINKER_RET_CHECK(API_LIB(vector_sum_i32o64)((const int32_t *)input->dptr_, 
                                                          (int64_t *)output->dptr_, 
-                                                         input->shape_.dims_[axis], shift);
+                                                         input->shape_.dims_[axis], shift), "luna_vector_sum_i32o64");
                     }
                     break;
                 default:
@@ -135,7 +134,7 @@ int32_t iqsum_luna(tTensor *input, tTensor *Temp, tTensor *output, iqSumAttrs *a
             return T_ERR_INVALID_DATATYPE;
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif  // _SUM_LUNA_H_

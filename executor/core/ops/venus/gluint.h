@@ -48,12 +48,12 @@ int32_t gluint_luna(tTensor *X, tTensor *Y, tTensor *workspace, GluIntAttrs *att
     // 2. Apply quantization delta
     // 3. Compute sigmoid
     // 4. Multiply with input (srcA) and scale to output
-    int32_t ret = API_LIB(scale_i8i8o32)(srcB, 1, tmp, size, 0);
-    ret |= API_LIB(scale_i32i32o32)(tmp, (1 << delt_q), tmp, size, 0);
-    ret |= API_LIB(sigmoid_i32o8)(tmp, dst, size);
-    ret |= API_LIB(mul_i8i8o8)(srcA, dst, dst, size, (7 + x_q - y_q));
+    THINKER_RET_CHECK(API_LIB(scale_i8i8o32)(srcB, 1, tmp, size, 0), "luna_scale_i8i8o32");;
+    THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(tmp, (1 << delt_q), tmp, size, 0), "luna_scale_i32i32o32");;
+    THINKER_RET_CHECK(API_LIB(sigmoid_i32o8)(tmp, dst, size), "luna_sigmoid_i32o8");;
+    THINKER_RET_CHECK(API_LIB(mul_i8i8o8)(srcA, dst, dst, size, (7 + x_q - y_q)), "luna_mul_i8i8o8");;
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif  // _GLU_LUNA_H_

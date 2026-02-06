@@ -22,7 +22,7 @@
  */
 int32_t requant_luna(tTensor* X, tTensor* Y) {
     if (X->dtype_ != Int8) {
-        return -1;
+        return T_ERR_INVALID_DATATYPE;
     }
 
     size_t size = getTensorSize(X);
@@ -50,25 +50,25 @@ int32_t requant_luna(tTensor* X, tTensor* Y) {
             int32_t* input = (int32_t*)X->dptr_;
             int32_t scale = q_y > q_x ? q_y - q_x : 1 << (q_y - q_x);
             int32_t shift = q_x > q_y ? q_x - q_y : 0;
-            API_LIB(scale_q31_int32)(input, scale, output, size, shift);
+            THINKER_RET_CHECK(API_LIB(scale_q31_int32)(input, scale, output, size, shift), "scale_q31_int32");
         } else if (dst_bits == 16) {
             int16_t* output = (int16_t*)Y->dptr_;
             int16_t* input = (int16_t*)X->dptr_;
             int32_t scale = q_y > q_x ? q_y - q_x : 1 << (q_y - q_x);
             int32_t shift = q_x > q_y ? q_x - q_y : 0;
-            API_LIB(scale_q15_int16)(input, scale, output, size, shift);
+            THINKER_RET_CHECK(API_LIB(scale_q15_int16)(input, scale, output, size, shift), "scale_q15_int16");
         } else if (dst_bits == 8) {
             int8_t* output = (int8_t*)Y->dptr_;
             int8_t* input = (int8_t*)X->dptr_;
             int32_t scale = q_y > q_x ? 1 << (q_y - q_x) : 1;
             int32_t shift = q_x > q_y ? q_x - q_y : 0;
-            API_LIB(scale_q7_int8)(input, scale, output, size, shift);
+            THINKER_RET_CHECK(API_LIB(scale_q7_int8)(input, scale, output, size, shift), "scale_q7_int8");
         }
     } else {
         return T_ERR_FAIL;
     }
 
-    return 0;
+    return T_SUCCESS;
 }
 
 #endif

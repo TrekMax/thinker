@@ -86,8 +86,6 @@ static void conv2dint_luna_para_init(Conv2dIntAttrs *attrs, conv_struct_t *conv_
 
 // Main convolution function
 int32_t conv2dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y, tTensor *Temp, Conv2dIntAttrs *attrs) {
-  int32_t ret     = T_ERR_FAIL;
-
   int8_t *p_src   = (int8_t *)(X->dptr_);
   int8_t *p_weight= (int8_t *)(W->dptr_);
   int32_t *p_bias = Bias ? (int32_t *)(Bias->dptr_) : NULL;
@@ -142,11 +140,11 @@ int32_t conv2dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y, tTenso
             for (int32_t i = 0; i < split_in_num; i++) {
               conv_attrs.reserved = skip_load_weight | ((i + 1) << 16);
               skip_load_weight = 1 << 8;
-              ret = luna_split_conv_para_pack(&conv_attrs, &conv_static_para, LUNA_CONV);
+              THINKER_RET_CHECK(luna_split_conv_para_pack(&conv_attrs, &conv_static_para, LUNA_CONV), "luna_split_conv_para_pack");
               if (Int4 == W->dtype_)
-                ret = API_LIB(conv2d_i8i4o8)(p_src, p_weight, p_bias, (int8_t *)p_tmp, &conv_static_para);
+                THINKER_RET_CHECK(API_LIB(conv2d_i8i4o8)(p_src, p_weight, p_bias, (int8_t *)p_tmp, &conv_static_para), "luna_conv2d_i8i4o8");
               else if (Int8 == W->dtype_)
-                ret = API_LIB(conv2d_i8i8o8)(p_src, p_weight, p_bias, (int8_t *)p_tmp, &conv_static_para);
+                THINKER_RET_CHECK(API_LIB(conv2d_i8i8o8)(p_src, p_weight, p_bias, (int8_t *)p_tmp, &conv_static_para), "luna_conv2d_i8i8o8");
 
               tmp_ou_h = (i == split_in_num - 1) ? (ou_h - tmp_ou_h * (split_in_num - 1)) : split_max_ou_h;
               int32_t one_channel_ou_offset = ou_w * split_max_ou_h * (0xF & Y->dtype_);
@@ -157,11 +155,11 @@ int32_t conv2dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y, tTenso
             }
           }
           else {
-            ret = luna_split_conv_para_pack(&conv_attrs, &conv_static_para, LUNA_CONV);
+            THINKER_RET_CHECK(luna_split_conv_para_pack(&conv_attrs, &conv_static_para, LUNA_CONV), "luna_split_conv_para_pack");
             if (Int4 == W->dtype_)
-              ret = API_LIB(conv2d_i8i4o8)(p_src, p_weight, p_bias, (int8_t *)p_tmp, &conv_static_para);
+              THINKER_RET_CHECK(API_LIB(conv2d_i8i4o8)(p_src, p_weight, p_bias, (int8_t *)p_tmp, &conv_static_para), "luna_conv2d_i8i4o8");
             else if (Int8 == W->dtype_)
-              ret = API_LIB(conv2d_i8i8o8)(p_src, p_weight, p_bias, (int8_t *)p_tmp, &conv_static_para);
+              THINKER_RET_CHECK(API_LIB(conv2d_i8i8o8)(p_src, p_weight, p_bias, (int8_t *)p_tmp, &conv_static_para), "luna_conv2d_i8i8o8");
             opi_psram_cpy_out(p_dst, p_tmp, ou_c * ou_h * ou_w);
           }
 #if !(defined(WIN32) || defined(linux))
@@ -170,11 +168,11 @@ int32_t conv2dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y, tTenso
         }
         else {
           conv_attrs.reserved = 0;
-          ret = luna_split_conv_para_pack(&conv_attrs, &conv_static_para, LUNA_CONV);
+          THINKER_RET_CHECK(luna_split_conv_para_pack(&conv_attrs, &conv_static_para, LUNA_CONV), "luna_split_conv_para_pack");
           if (Int4 == W->dtype_)
-            ret = API_LIB(conv2d_i8i4o8)(p_src, p_weight, p_bias, p_dst, &conv_static_para);
+            THINKER_RET_CHECK(API_LIB(conv2d_i8i4o8)(p_src, p_weight, p_bias, p_dst, &conv_static_para), "luna_conv2d_i8i4o8");
           else if (Int8 == W->dtype_)  
-            ret = API_LIB(conv2d_i8i8o8)(p_src, p_weight, p_bias, p_dst, &conv_static_para);
+            THINKER_RET_CHECK(API_LIB(conv2d_i8i8o8)(p_src, p_weight, p_bias, p_dst, &conv_static_para), "luna_conv2d_i8i8o8");
         }
       } 
       else if (attrs->group == conv_attrs.input_c &&attrs->group == conv_attrs.output_c)  // depthwise
@@ -192,14 +190,12 @@ int32_t conv2dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y, tTenso
           for (int32_t i = 0; i < split_in_num; i++) {
             conv_attrs.reserved = skip_load_weight | ((i + 1) << 16);
             skip_load_weight = 1 << 8;
-            ret = luna_split_conv_para_pack(&conv_attrs, &conv_static_para, LUNA_DEPTHWISE);
-            if (ret != T_SUCCESS)
-              return ret;
+            THINKER_RET_CHECK(luna_split_conv_para_pack(&conv_attrs, &conv_static_para, LUNA_DEPTHWISE), "luna_split_conv_para_pack");
 
             if (Int4 == W->dtype_)
-              ret = API_LIB(depthwise2d_i8i4o8)(p_src, p_weight, p_bias, (int8_t *)p_tmp, &conv_static_para);
+              THINKER_RET_CHECK(API_LIB(depthwise2d_i8i4o8)(p_src, p_weight, p_bias, (int8_t *)p_tmp, &conv_static_para), "luna_depthwise2d_i8i4o8");
             else if (Int8 == W->dtype_)
-              ret = API_LIB(depthwise2d_i8i8o8)(p_src, p_weight, p_bias, (int8_t *)p_tmp, &conv_static_para);
+              THINKER_RET_CHECK(API_LIB(depthwise2d_i8i8o8)(p_src, p_weight, p_bias, (int8_t *)p_tmp, &conv_static_para), "luna_depthwise2d_i8i8o8");
 
             tmp_ou_h = (i == split_in_num - 1) ? (ou_h - tmp_ou_h * (split_in_num - 1)) : split_max_ou_h;
             int32_t one_channel_ou_offset = ou_w * split_max_ou_h * (0xF & Y->dtype_);
@@ -214,13 +210,11 @@ int32_t conv2dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y, tTenso
         }
         else {
           conv_attrs.reserved = 0;
-          ret = luna_split_conv_para_pack(&conv_attrs, &conv_static_para, LUNA_DEPTHWISE);
-          if (ret != T_SUCCESS)
-            return ret;
+          THINKER_RET_CHECK(luna_split_conv_para_pack(&conv_attrs, &conv_static_para, LUNA_DEPTHWISE), "luna_split_conv_para_pack");
           if (Int4 == W->dtype_)
-            ret = API_LIB(depthwise2d_i8i4o8)(p_src, p_weight, p_bias, p_dst, &conv_static_para);
+            THINKER_RET_CHECK(API_LIB(depthwise2d_i8i4o8)(p_src, p_weight, p_bias, p_dst, &conv_static_para), "luna_depthwise2d_i8i4o8");
           else if (Int8 == W->dtype_)
-            ret = API_LIB(depthwise2d_i8i8o8)(p_src, p_weight, p_bias, p_dst, &conv_static_para);        
+            THINKER_RET_CHECK(API_LIB(depthwise2d_i8i8o8)(p_src, p_weight, p_bias, p_dst, &conv_static_para), "luna_depthwise2d_i8i8o8");
         }
       }
       else  // group conv2d, should splited in tpacker
@@ -234,6 +228,6 @@ int32_t conv2dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y, tTenso
     return T_ERR_INVALID_PARA;
   }
 
-  return ret;
+  return T_SUCCESS;
 }
 #endif  //_CONV2DINT_VENUS_H_

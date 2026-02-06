@@ -65,8 +65,6 @@ static void luna_maxpool_para_init(PoolAttrs* attrs, conv_struct_t *conv_attrs, 
  * @return Execution status
  */
 int32_t maxpool_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs *attrs) {
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
-
     // Check if input data type is Int8
     if (Int8 != X->dtype_) {
         return T_ERR_INVALID_DATATYPE;
@@ -97,14 +95,13 @@ int32_t maxpool_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs *att
 
     // Process data based on memory type
     if (Y->mem_.type_ == 2) {
-        ret = luna_split_conv_para_pack(&pool_struct_, &conv_static_para, LUNA_MAX_POOLING);
-        if (ret != T_SUCCESS) return ret;
+        THINKER_RET_CHECK(luna_split_conv_para_pack(&pool_struct_, &conv_static_para, LUNA_MAX_POOLING), "luna_split_conv_para_pack");
 
         // Process each batch
         for (int32_t n = 0; n < batch; n++) {
             int8_t *p_in = (int8_t *)X->dptr_ + n * in_batch_size;
             int8_t *p_out = (int8_t *)Y->dptr_ + n * ou_batch_size;
-            ret = API_LIB(max_pooling2d_i8o8)(p_in, p_out, &conv_static_para);
+            THINKER_RET_CHECK(API_LIB(max_pooling2d_i8o8)(p_in, p_out, &conv_static_para), "luna_max_pooling2d_i8o8");
         }
     } else {
         // Calculate workspace size
@@ -125,17 +122,16 @@ int32_t maxpool_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs *att
                 pool_struct_.input_c = ch_cur;
                 pool_struct_.output_c = ch_cur;
 
-                ret = luna_split_conv_para_pack(&pool_struct_, &conv_static_para, LUNA_MAX_POOLING);
-                if (ret != T_SUCCESS) return ret;
+                THINKER_RET_CHECK(luna_split_conv_para_pack(&pool_struct_, &conv_static_para, LUNA_MAX_POOLING), "luna_split_conv_para_pack");
 
-                ret = API_LIB(max_pooling2d_i8o8)(p_in + ch_start * in_space, (int8_t *)Temp->dptr_, &conv_static_para);
+                THINKER_RET_CHECK(API_LIB(max_pooling2d_i8o8)(p_in + ch_start * in_space, (int8_t *)Temp->dptr_, &conv_static_para), "luna_max_pooling2d_i8o8");
                 opi_psram_cpy_out(p_out + ch_start * out_space, (int8_t *)Temp->dptr_, ch_cur * out_space * Y->byte_);
                 ch_start += ch_cur;
             }
         }
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif

@@ -11,8 +11,8 @@
  * Copyright (C) 2022 listenai Co.Ltd
  * All rights reserved.
  */
-#ifndef __THINKER_ENGINE_HPP__
-#define __THINKER_ENGINE_HPP__
+#ifndef __THINKER_API_H__
+#define __THINKER_API_H__
 
 #include <stdint.h>
 
@@ -178,4 +178,4 @@ THINKER_API(const thinkerApi *, thinkerGetApi, ());
 } /* extern "C" */
 #endif /* C++ */
 
-#endif  // __THINKER_ENGINE_HPP__
+#endif  // __THINKER_API_H__

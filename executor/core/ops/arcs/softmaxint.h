@@ -26,10 +26,7 @@
  * @param attrs Softmax attributes
  * @return Operation result status
  */
-int32_t softmaxint_luna(tTensor *data, tTensor *out, tTensor *Workspace, SoftmaxIntAttrs *attrs)
-{
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
-
+int32_t softmaxint_luna(tTensor *data, tTensor *out, tTensor *Workspace, SoftmaxIntAttrs *attrs) {
     const int32_t SOFTMAX_Q_IN = 25;
     const int32_t SOFTMAX_Q_OUT = 15;
     int32_t leading = 1, stride = 1;
@@ -71,11 +68,11 @@ int32_t softmaxint_luna(tTensor *data, tTensor *out, tTensor *Workspace, Softmax
 
         // Convert input to appropriate fixed-point format
         if (Int8 == data->dtype_) {
-            ret = API_LIB(scale_i8i8o32)((int8_t *)data->dptr_, 1, (int32_t *)data_temp, data_size, 0);  // Q4->Q25
-            ret = API_LIB(scale_i32i32o32)((int32_t *)data_temp, (1 << (SOFTMAX_Q_IN - x_scale)), (int32_t *)data_temp, data_size, 0);  // Q4->Q25
+            THINKER_RET_CHECK(API_LIB(scale_i8i8o32)((int8_t *)data->dptr_, 1, (int32_t *)data_temp, data_size, 0), "luna_scale_i8i8o32");  // Q4->Q25
+            THINKER_RET_CHECK(API_LIB(scale_i32i32o32)((int32_t *)data_temp, (1 << (SOFTMAX_Q_IN - x_scale)), (int32_t *)data_temp, data_size, 0), "luna_scale_i32i32o32");  // Q4->Q25
         }
         else if (Int32 == data->dtype_)
-            ret = API_LIB(scale_i32i32o32)((int32_t *)data->dptr_, (1 << (SOFTMAX_Q_IN - x_scale)), (int32_t *)data_temp, data_size, 0);  // Q4->Q25;
+            THINKER_RET_CHECK(API_LIB(scale_i32i32o32)((int32_t *)data->dptr_, (1 << (SOFTMAX_Q_IN - x_scale)), (int32_t *)data_temp, data_size, 0), "luna_scale_i32i32o32");  // Q4->Q25;
         else
             return T_ERR_INVALID_DATATYPE;
 
@@ -85,20 +82,20 @@ int32_t softmaxint_luna(tTensor *data, tTensor *out, tTensor *Workspace, Softmax
             for (int32_t l = 0; l < leading; ++l)
             {
                 int32_t offset = l * stride;
-                ret = API_LIB(softmax_i32o32)((int32_t *)data_temp + offset, (int32_t *)dst_tmp, stride);  // Q25->Q15        
-                ret |= API_LIB(scale_i32i32o8)((int32_t *)dst_tmp, 1, (int8_t *)out->dptr_ + offset, stride, (SOFTMAX_Q_OUT - y_scale));
+                THINKER_RET_CHECK(API_LIB(softmax_i32o32)((int32_t *)data_temp + offset, (int32_t *)dst_tmp, stride), "luna_softmax_i32o32");  // Q25->Q15        
+                THINKER_RET_CHECK(API_LIB(scale_i32i32o8)((int32_t *)dst_tmp, 1, (int8_t *)out->dptr_ + offset, stride, (SOFTMAX_Q_OUT - y_scale)), "luna_scale_i32i32o8");
             }
         }
         else if (Int32 == out->dtype_) {
             for (int32_t l = 0; l < leading; ++l)
             {
                 int32_t offset = l * stride;
-                ret = API_LIB(softmax_i32o32)((int32_t *)data_temp + offset, (int32_t *)out->dptr_ + offset, stride);  // Q25->Q15        
+                THINKER_RET_CHECK(API_LIB(softmax_i32o32)((int32_t *)data_temp + offset, (int32_t *)out->dptr_ + offset, stride), "luna_softmax_i32o32");  // Q25->Q15        
             }
         }
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif

@@ -31,16 +31,4 @@ class PRelu(UnaryOperator, BaseLayout):
     pass
 
 
-@register_op
-class Sigmoid(UnaryOperator, BaseLayout):
-    """Sigmoid activation function."""
-    pass
-
-
-@register_op
-class Tanh(UnaryOperator, BaseLayout):
-    """Hyperbolic Tangent (Tanh) activation function."""
-    pass
-
-
-__all__ = ["Relu", "PRelu", "Sigmoid", "Tanh"]
+__all__ = ["Relu", "PRelu"]

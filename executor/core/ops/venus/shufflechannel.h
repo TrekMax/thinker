@@ -99,10 +99,10 @@ int32_t shufflechannel_venus(tTensor *X, tTensor *Y, ShuffleChannelAttrs *attr) 
         channel_shuffle_nhwc(X, Y, attr->num_group);
     } else {
         THINKER_LOG_FATAL("Unsupported axis!");
-        return -1;
+        return T_ERR_INVALID_PARA;
     }
 
-    return 0;
+    return T_SUCCESS;
 }
 
 #endif

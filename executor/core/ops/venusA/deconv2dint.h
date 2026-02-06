@@ -71,7 +71,6 @@ static void deconv2dint_luna_para_init(ConvTranspose2dIntAttrs *attrs, conv_stru
 /// Main deconvolution function
 int32_t deconv2dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y, 
                        tTensor *Temp, ConvTranspose2dIntAttrs *attrs) {
-    int32_t ret = T_ERR_FAIL;
     int8_t *src = (int8_t *)(X->dptr_);
     int8_t *weight = (int8_t *)(W->dptr_);
     int32_t *bias = Bias ? (int32_t *)(Bias->dptr_) : NULL;
@@ -92,17 +91,16 @@ int32_t deconv2dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y,
 
     // Common deconvolution
     if(attrs->group == 1) {
-        ret = luna_split_conv_para_pack(&conv_attrs, &conv_static_para, LUNA_DECONV);
-        if(ret != T_SUCCESS) return ret;
+        THINKER_RET_CHECK(luna_split_conv_para_pack(&conv_attrs, &conv_static_para, LUNA_DECONV), "luna_split_conv_para_pack");
 
         // Determine output destination
         dst = (Y->mem_.type_ != 2) ? tmp : dst;
 
         // Execute deconvolution based on weight type
         if(W->dtype_ == Int4)
-            ret |= API_LIB(deconv2d_i8i4o8)(src, weight, bias, dst, &conv_static_para);
+            THINKER_RET_CHECK(API_LIB(deconv2d_i8i4o8)(src, weight, bias, dst, &conv_static_para), "luna_deconv2d_i8i4o8");
         else if(W->dtype_ == Int8)
-            ret |= API_LIB(deconv2d_i8i8o8)(src, weight, bias, dst, &conv_static_para);
+            THINKER_RET_CHECK(API_LIB(deconv2d_i8i8o8)(src, weight, bias, dst, &conv_static_para), "luna_deconv2d_i8i8o8");
 
         // Copy output to final destination if temporary buffer was used
         if(Y->mem_.type_ != 2) {
@@ -115,7 +113,7 @@ int32_t deconv2dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y,
         return T_ERR_INVALID_PARA;
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif  //_DECONV2DINT_ARCS_H_

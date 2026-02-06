@@ -103,9 +103,7 @@ static int32_t luna_ceil(int32_t x, int32_t shift) {
 static int32_t calc_linearint_luna(tTensor *input, tTensor *weight,
                                    tTensor *bias, tTensor *output,
                                    tTensor *tmp) {
-  int32_t ret = T_ERR_FAIL;
   tShape new_shape;
-
     // Adjust input shape if necessary
   if (1 == input->shape_.ndim_) {
     new_shape.ndim_ = 2;
@@ -151,7 +149,7 @@ static int32_t calc_linearint_luna(tTensor *input, tTensor *weight,
   }
 
   if (shift < 0) {
-    return ret;
+    return T_ERR_INVALID_PARA;;
   }
 
   switch (input->dtype_) {
@@ -200,45 +198,45 @@ static int32_t calc_linearint_luna(tTensor *input, tTensor *weight,
                 p_tmp_ou = p_tmp_in;
                 tmp_size += split_out_size * 4;
                 if (tmp_size > workspace_size)
-                    return -1;
+                    return T_ERR_NO_WORKSPACE;
 
                 luna_mat_mul_api = (FC_MAT_MUL_LUNA_API)fc_luna_api_list[0][bias_idx].luna_api;
-                ret = luna_mat_mul_api(p_tmp_in, p_weight, p_tmp, split_M, N, L, 0);
+                THINKER_RET_CHECK(luna_mat_mul_api(p_tmp_in, p_weight, p_tmp, split_M, N, L, 0), "luna_mat_mul_api");
 
                 for (int32_t j = 0; j < split_M; j++) {
                   FC_VEC_ADD_LUNA_API luna_add_api =
                       (FC_VEC_ADD_LUNA_API)fc_luna_api_list[2 + bias_idx][ou_idx].luna_api;
                   int8_t *tsrc1 = (int8_t *)p_tmp + j * L * (bias->dtype_ & 0xF);
                   int8_t *tdst = (int8_t *)p_tmp_ou + j * L * (output->dtype_ & 0xF);
-                  ret |= luna_add_api(tsrc1, p_bis, tdst, L, shift);
+                  THINKER_RET_CHECK(luna_add_api(tsrc1, p_bis, tdst, L, shift), "luna_add_api");
                 }
               }
               else {
                 p_tmp_ou = (int8_t *)tmp->dptr_ + tmp_size;
                 tmp_size += split_out_size;
                 if (tmp_size > workspace_size)
-                  return -1;
+                  return T_ERR_NO_WORKSPACE;
 
                 luna_mat_mul_api = (FC_MAT_MUL_LUNA_API)fc_luna_api_list[0][ou_idx].luna_api;
-                ret = luna_mat_mul_api(p_tmp_in, p_weight, p_tmp_ou, split_M, N, L, shift);
+                THINKER_RET_CHECK(luna_mat_mul_api(p_tmp_in, p_weight, p_tmp_ou, split_M, N, L, shift), "luna_mat_mul_api");
               }
-              memcpy(p_out + ou_oft, p_tmp_ou, split_out_size);
+              memcpy((int8_t *)p_out + ou_oft, p_tmp_ou, split_out_size);
             }
             else {
               if (has_bias) {
                 int32_t *p_tmp = (int32_t *)((int8_t *)tmp->dptr_ + tmp_size);
                 luna_mat_mul_api = (FC_MAT_MUL_LUNA_API)fc_luna_api_list[0][bias_idx].luna_api;
-                ret = luna_mat_mul_api(p_tmp_in, p_weight, p_tmp, split_M, N, L, 0);
+                THINKER_RET_CHECK(luna_mat_mul_api(p_tmp_in, p_weight, p_tmp, split_M, N, L, 0), "luna_mat_mul_api");
 
                 for (int32_t j = 0; j < split_M; j++) {
                   FC_VEC_ADD_LUNA_API luna_add_api = (FC_VEC_ADD_LUNA_API)fc_luna_api_list[2 + bias_idx][ou_idx].luna_api;
                   int8_t *tsrc1 = (int8_t *)p_tmp + j * L * (bias->dtype_ & 0xF);
                   int8_t *tdst = (int8_t *)p_tmp_ou + j * L * (output->dtype_ & 0xF);
-                  ret |= luna_add_api(tsrc1, p_bis, tdst, L, shift);
+                  THINKER_RET_CHECK(luna_add_api(tsrc1, p_bis, tdst, L, shift), "luna_add_api");
                 }
               } else {
                 luna_mat_mul_api = (FC_MAT_MUL_LUNA_API)fc_luna_api_list[0][ou_idx].luna_api;
-                ret = luna_mat_mul_api(p_tmp_in, p_weight, p_tmp_ou, split_M, N, L, shift);
+                THINKER_RET_CHECK(luna_mat_mul_api(p_tmp_in, p_weight, p_tmp_ou, split_M, N, L, shift), "luna_mat_mul_api");
               }
             }
           }
@@ -280,43 +278,43 @@ static int32_t calc_linearint_luna(tTensor *input, tTensor *weight,
                 p_tmp_ou = p_tmp_in;
                 tmp_size += split_out_size * 4; //sizeof(int32_t)
                 if (tmp_size > workspace_size)
-                  return -1;
+                  return T_ERR_NO_WORKSPACE;
                 luna_mat_mul_api =
                     (FC_SPLIT_MAT_MUL_LUNA_API)fc_luna_api_list[1][bias_idx].luna_api;
-                ret = luna_mat_mul_api(p_tmp_in, p_weight, p_tmp, split_num, split_M, N, L, 0);
+                THINKER_RET_CHECK(luna_mat_mul_api(p_tmp_in, p_weight, p_tmp, split_num, split_M, N, L, 0), "luna_mat_mul_api");
 
                 for (int32_t j = 0; j < split_M; j++) {
                   FC_VEC_ADD_LUNA_API luna_add_api = (FC_VEC_ADD_LUNA_API)fc_luna_api_list[2 + bias_idx][ou_idx].luna_api;
                   int8_t *tsrc1 = (int8_t *)p_tmp + j * L * (bias->dtype_ & 0xF);
                   int8_t *tdst = (int8_t *)p_tmp_ou + j * L * (output->dtype_ & 0xF);
-                  ret |= luna_add_api(tsrc1, p_bis, tdst, L, shift);
+                  THINKER_RET_CHECK(luna_add_api(tsrc1, p_bis, tdst, L, shift), "luna_add_api");
                 }
               }
               else {
                 p_tmp_ou = (int8_t *)tmp->dptr_ + tmp_size;
                 tmp_size += split_out_size;
                 if (tmp_size > workspace_size)
-                  return -1;
+                  return T_ERR_NO_WORKSPACE;
                 luna_mat_mul_api =
                   (FC_SPLIT_MAT_MUL_LUNA_API)fc_luna_api_list[1][ou_idx].luna_api;
-                ret = luna_mat_mul_api(p_tmp_in, p_weight, p_tmp_ou, split_num, split_M, N, L, shift);
+                THINKER_RET_CHECK(luna_mat_mul_api(p_tmp_in, p_weight, p_tmp_ou, split_num, split_M, N, L, shift), "luna_mat_mul_api");
               }
-              memcpy(p_out + ou_oft, p_tmp_ou, split_out_size);
+              memcpy((int8_t *)p_out + ou_oft, p_tmp_ou, split_out_size);
             }
             else {
               if (has_bias) {
                 int32_t *p_tmp = (int32_t *)((int8_t *)tmp->dptr_ + tmp_size);
                 luna_mat_mul_api = (FC_SPLIT_MAT_MUL_LUNA_API)fc_luna_api_list[1][bias_idx].luna_api;
-                ret = luna_mat_mul_api(p_tmp_in, p_weight, p_tmp, split_num, split_M, N, L, 0);
+                THINKER_RET_CHECK(luna_mat_mul_api(p_tmp_in, p_weight, p_tmp, split_num, split_M, N, L, 0), "luna_mat_mul_api");
                 for (int32_t j = 0; j < split_M; j++) {
                   FC_VEC_ADD_LUNA_API luna_add_api = (FC_VEC_ADD_LUNA_API)fc_luna_api_list[2 + bias_idx][ou_idx].luna_api;
                   int8_t *tsrc1 = (int8_t *)p_tmp + j * L * (bias->dtype_ & 0xF);
                   int8_t *tdst = (int8_t *)p_tmp_ou + j * L * (output->dtype_ & 0xF);
-                  ret |= luna_add_api(tsrc1, p_bis, tdst, L, shift);
+                  THINKER_RET_CHECK(luna_add_api(tsrc1, p_bis, tdst, L, shift), "luna_add_api");
                 }
               } else {
                 luna_mat_mul_api = (FC_SPLIT_MAT_MUL_LUNA_API)fc_luna_api_list[1][ou_idx].luna_api;
-                ret = luna_mat_mul_api(p_tmp_in, p_weight, p_tmp_ou, split_num, split_M, N, L, shift);
+                THINKER_RET_CHECK(luna_mat_mul_api(p_tmp_in, p_weight, p_tmp_ou, split_num, split_M, N, L, shift), "luna_mat_mul_api");
               }
             }
           }
@@ -340,7 +338,7 @@ static int32_t calc_linearint_luna(tTensor *input, tTensor *weight,
             p_tmp_ou = (int8_t *)tmp->dptr_ + tmp_size;
             tmp_size += M * L;
             if (tmp_size > workspace_size)
-              return -1;
+              return T_ERR_NO_WORKSPACE;
           }
         }
 
@@ -350,19 +348,19 @@ static int32_t calc_linearint_luna(tTensor *input, tTensor *weight,
             int32_t *p_tmp = (int32_t *)((int8_t *)tmp->dptr_ + tmp_size);
             tmp_size += M * L * 4; //sizeof(int32_t)
             if (tmp_size > workspace_size)
-              return -1;
+              return T_ERR_NO_WORKSPACE;
             luna_mat_mul_api = (FC_MAT_MUL_LUNA_API)fc_luna_api_list[0][bias_idx].luna_api;
-            ret = luna_mat_mul_api(p_tmp_in, p_weight, p_tmp, M, N, L, 0);
+            THINKER_RET_CHECK(luna_mat_mul_api(p_tmp_in, p_weight, p_tmp, M, N, L, 0), "luna_mat_mul_api");
 
             for (int32_t i = 0; i < M; i++) {
               FC_VEC_ADD_LUNA_API luna_add_api = (FC_VEC_ADD_LUNA_API)fc_luna_api_list[2 + bias_idx][ou_idx].luna_api;
               int8_t *tsrc1 = (int8_t *)p_tmp + i * L * (bias->dtype_ & 0xF);
               int8_t *tdst = (int8_t *)p_tmp_ou + i * L * (output->dtype_ & 0xF);
-              ret |= luna_add_api(tsrc1, p_bis, tdst, L, shift);
+              THINKER_RET_CHECK(luna_add_api(tsrc1, p_bis, tdst, L, shift), "luna_add_api");
             }
           } else {
             luna_mat_mul_api = (FC_MAT_MUL_LUNA_API)fc_luna_api_list[0][ou_idx].luna_api;
-            ret = luna_mat_mul_api(p_tmp_in, p_weight, p_tmp_ou, M, N, L, shift);
+            THINKER_RET_CHECK(luna_mat_mul_api(p_tmp_in, p_weight, p_tmp_ou, M, N, L, shift), "luna_mat_mul_api");
           }
         }
         else { // big martrix split on col
@@ -380,18 +378,18 @@ static int32_t calc_linearint_luna(tTensor *input, tTensor *weight,
               int32_t *p_tmp = (int32_t *)((int8_t *)tmp->dptr_ + tmp_size);
               tmp_size += M * L * 4; //sizeof(int32_t)
               if (tmp_size > workspace_size)
-                return -1;
+                return T_ERR_NO_WORKSPACE;
               luna_mat_mul_api = (FC_SPLIT_MAT_MUL_LUNA_API)fc_luna_api_list[1][bias_idx].luna_api;
-              ret = luna_mat_mul_api(p_tmp_in, p_weight, p_tmp, split_num, M, N, L, 0);
+              THINKER_RET_CHECK(luna_mat_mul_api(p_tmp_in, p_weight, p_tmp, split_num, M, N, L, 0), "luna_mat_mul_api");
               for (int32_t i = 0; i < M; i++) {
                 FC_VEC_ADD_LUNA_API luna_add_api = (FC_VEC_ADD_LUNA_API)fc_luna_api_list[2 + bias_idx][ou_idx].luna_api;
                 int8_t *tsrc1 = (int8_t *)p_tmp + i * L * (bias->dtype_ & 0xF);
                 int8_t *tdst = (int8_t *)p_tmp_ou + i * L * (output->dtype_ & 0xF);
-                ret |= luna_add_api(tsrc1, p_bis, tdst, L, shift);
+                THINKER_RET_CHECK(luna_add_api(tsrc1, p_bis, tdst, L, shift), "luna_add_api");
               }
             } else {
               luna_mat_mul_api = (FC_SPLIT_MAT_MUL_LUNA_API)fc_luna_api_list[1][ou_idx].luna_api;
-              ret = luna_mat_mul_api(p_tmp_in, p_weight, p_tmp_ou, split_num, M, N, L, shift);
+              THINKER_RET_CHECK(luna_mat_mul_api(p_tmp_in, p_weight, p_tmp_ou, split_num, M, N, L, shift), "luna_mat_mul_api");
             }
           }
         }
@@ -405,7 +403,7 @@ static int32_t calc_linearint_luna(tTensor *input, tTensor *weight,
     case Int16: {
       int32_t int8_condition_l = (luna_ceil(M, 2) << 2) * (luna_ceil(N, 3) << 3) * sizeof(int16_t);  // right:4x8
       if (int8_condition_l > left_limit) {
-        return ret;
+        return T_ERR_INVALID_PARA;
       }
       int32_t int8_condition_r =
           (luna_ceil(N, 3) << 3) * (luna_ceil(L, 2) << 2) * sizeof(int16_t);  // right:8x4
@@ -419,7 +417,7 @@ static int32_t calc_linearint_luna(tTensor *input, tTensor *weight,
         } else {
           luna_mat_mul_api =
               (FC_MAT_MUL_LUNA_INT16_API)fc_luna_int16_api_list[0][ou_idx].luna_api;
-          ret = luna_mat_mul_api((int16_t *)p_in, (int16_t *)p_weight, p_out, M, N, L, shift);
+          THINKER_RET_CHECK(luna_mat_mul_api((int16_t *)p_in, (int16_t *)p_weight, p_out, M, N, L, shift), "luna_mat_mul_api");
         }
       } else  // big martrix split on col
       {
@@ -440,12 +438,12 @@ static int32_t calc_linearint_luna(tTensor *input, tTensor *weight,
             luna_mat_mul_api =
                 (FC_SPLIT_MAT_MUL_LUNA_INT16_API)fc_luna_int16_api_list[1][bias_idx]
                     .luna_api;
-            ret = luna_mat_mul_api((int16_t *)p_in, (int16_t *)p_weight, p_tmp, split_num, M, N, L, 0);
+            THINKER_RET_CHECK(luna_mat_mul_api((int16_t *)p_in, (int16_t *)p_weight, p_tmp, split_num, M, N, L, 0), "luna_mat_mul_api");
           } else {
             luna_mat_mul_api =
                 (FC_SPLIT_MAT_MUL_LUNA_INT16_API)fc_luna_int16_api_list[1][ou_idx].luna_api;
-            ret = luna_mat_mul_api((int16_t *)p_in, (int16_t *)p_weight, p_out, split_num, M, N, L,
-                                   shift);
+            THINKER_RET_CHECK(luna_mat_mul_api((int16_t *)p_in, (int16_t *)p_weight, p_out, split_num, M, N, L,
+                                   shift), "luna_mat_mul_api");
           }
         }
       }
@@ -456,7 +454,7 @@ static int32_t calc_linearint_luna(tTensor *input, tTensor *weight,
               (FC_VEC_ADD_LUNA_API)fc_luna_int16_api_list[2 + bias_idx][ou_idx].luna_api;
             int8_t *tsrc1 = (int8_t *)p_tmp + i * L * (bias->dtype_ & 0xF);
             int8_t *tdst = (int8_t *)p_out + i * L * (output->dtype_ & 0xF);
-            ret |= luna_add_api(tsrc1, p_bis, tdst, L, shift);
+            THINKER_RET_CHECK(luna_add_api(tsrc1, p_bis, tdst, L, shift), "luna_add_api");
           }
         }
 
@@ -470,7 +468,7 @@ static int32_t calc_linearint_luna(tTensor *input, tTensor *weight,
       break;
 
   }
-  return ret;
+  return T_SUCCESS;
 }
 
 int32_t linearint_luna(tTensor *input, tTensor *weight, tTensor *bias,

@@ -27,10 +27,7 @@
  * @param attrs Split attributes including axis and split sizes
  * @return Operation status
  */
-int32_t split_venus(tTensor *X, tTensor **tensors, SliceAttrs *attrs) 
-{
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
-    
+int32_t split_venus(tTensor *X, tTensor **tensors, SliceAttrs *attrs) {    
     // Handle negative axis values
     if (attrs->axis < 0) {
         attrs->axis += X->shape_.ndim_;
@@ -70,7 +67,7 @@ int32_t split_venus(tTensor *X, tTensor **tensors, SliceAttrs *attrs)
             for (int32_t i = 0; i < leading; ++i) {
                 int8_t *idst = (int8_t *)(out->dptr_) + i * attrs->split[n] * stride * out->byte_;
                 int8_t *isrc = (int8_t *)(X->dptr_) + i * middle * stride + offset * stride * X->byte_;
-                ret = API_LIB(memcpy_i8o8)(idst, isrc, sizeof(int8_t) * attrs->split[n] * stride * out->byte_);
+                THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(idst, isrc, sizeof(int8_t) * attrs->split[n] * stride * out->byte_), "luna_memcpy_i8o8");
             }
         } else {
             for (int32_t i = 0; i < leading; ++i) {
@@ -78,14 +75,12 @@ int32_t split_venus(tTensor *X, tTensor **tensors, SliceAttrs *attrs)
                 int8_t *isrc = (int8_t *)(X->dptr_) + i * middle * stride * X->byte_ + offset * stride * X->byte_;
                 opi_psram_cpy_out(idst, isrc, sizeof(int8_t) * attrs->split[n] * stride * out->byte_);
             }
-            ret = T_SUCCESS;
         }
         
-        ret = T_SUCCESS;
         offset += attrs->split[n];
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #if !(defined(WIN32) || defined(linux))

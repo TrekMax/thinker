@@ -172,9 +172,7 @@ static const int16_t calc_sqrt_reciprocal(const int64_t data, int32_t q_x, int32
  * @param attrs Layer normalization attributes
  * @return Status code indicating success or failure
  */
-int32_t layernormalint_venus(const tTensor *X, const tTensor *W, const tTensor *Bias, tTensor *Y, tTensor *workspace, LayerNormIntAttrs *attrs) {
-    int32_t ret = T_ERR_FAIL;
-    
+int32_t layernormalint_venus(const tTensor *X, const tTensor *W, const tTensor *Bias, tTensor *Y, tTensor *workspace, LayerNormIntAttrs *attrs) {   
     int32_t n_dims = X->shape_.ndim_;
     int32_t size = getTensorSize(W);
     int32_t leading = 1;
@@ -218,9 +216,10 @@ int32_t layernormalint_venus(const tTensor *X, const tTensor *W, const tTensor *
 
     // Copy weights and biases to temporary buffers if needed
     if ((1 == W->mem_.type_ || 3 == W->mem_.type_)) {
-        ret = API_LIB(memcpy_i8o8)(p_weight_tmp, p_gamma, T * sizeof(int8_t));
-        ret = API_LIB(memcpy_i8o8)((int8_t *)p_bias_tmp, (int8_t *)p_beta, T * sizeof(int32_t));
-    } else {
+        THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(p_weight_tmp, p_gamma, T * sizeof(int8_t)), "luna_memcpy_i8o8");
+        THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)p_bias_tmp, (int8_t *)p_beta, T * sizeof(int32_t)), "luna_memcpy_i8o8");
+    } 
+    else {
         p_weight_tmp = p_gamma;
         p_bias_tmp = p_beta;
     }
@@ -235,7 +234,7 @@ int32_t layernormalint_venus(const tTensor *X, const tTensor *W, const tTensor *
 
         // Handle memory type differences
         if (X->mem_.mem_type_ != 2) {
-            ret = API_LIB(memcpy_i8o8)(p_src_tmp, p_src + i * T, T * sizeof(int8_t));
+            THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(p_src_tmp, p_src + i * T, T * sizeof(int8_t)), "luna_memcpy_i8o8");
             p_src_once = p_src_tmp;
         }
         if (Y->mem_.mem_type_ != 2) {
@@ -243,9 +242,9 @@ int32_t layernormalint_venus(const tTensor *X, const tTensor *W, const tTensor *
         }
 
         // Compute sum and squared sum
-        ret = API_LIB(vector_sum_i8o32)(p_src_once, sum_x, T, 0);         // sum(x)
-        ret |= API_LIB(mul_i8i8o32)(p_src_once, p_src_once, p_src2, T, 0); // x^2
-        ret |= API_LIB(vector_sum_i32o32)(p_src2, sum_x2, T, 0);           // sum(x^2)
+        THINKER_RET_CHECK(API_LIB(vector_sum_i8o32)(p_src_once, sum_x, T, 0), "luna_vector_sum_i8o32");         // sum(x)
+        THINKER_RET_CHECK(API_LIB(mul_i8i8o32)(p_src_once, p_src_once, p_src2, T, 0), "luna_mul_i8i8o32"); // x^2
+        THINKER_RET_CHECK(API_LIB(vector_sum_i32o32)(p_src2, sum_x2, T, 0), "luna_vector_sum_i32o32");           // sum(x^2)
 
         int32_t sum_x_val = *sum_x;
         int32_t sum_x2_val = *sum_x2;
@@ -256,19 +255,19 @@ int32_t layernormalint_venus(const tTensor *X, const tTensor *W, const tTensor *
         denominator = calc_sqrt_reciprocal((const int64_t)denominator, q_x, &label_shift);  // 1/N
 
         // Normalize and apply weights/bias
-        ret |= API_LIB(scale_i8i8o32)(p_src_once, 1, p_numerator, T, 0);
-        ret |= API_LIB(scale_i32i32o32)(p_numerator, T, p_numerator, T, 0);                // T*x
-        ret |= API_LIB(offset_i32i32o32)(p_numerator, (0 - sum_x_val), p_numerator, T, 0);
-        ret |= API_LIB(scale_i32i32o32)(p_numerator, denominator, (int32_t *)p_y1, T, label_shift);
+        THINKER_RET_CHECK(API_LIB(scale_i8i8o32)(p_src_once, 1, p_numerator, T, 0), "luna_scale_i8i8o32");
+        THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(p_numerator, T, p_numerator, T, 0), "luna_scale_i32i32o32");                // T*x
+        THINKER_RET_CHECK(API_LIB(offset_i32i32o32)(p_numerator, (0 - sum_x_val), p_numerator, T, 0), "luna_offset_i32i32o32");
+        THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(p_numerator, denominator, (int32_t *)p_y1, T, label_shift), "luna_scale_i32i32o32");
         
         // Apply weight and bias
         if (Int4 == W->dtype_) {
             convert_4bitto32bit(p_weight, p_weight_tmp, T);
         } else {
-            ret |= API_LIB(scale_i8i8o32)(p_weight_tmp, 1, p_weight, T, 0);
+            THINKER_RET_CHECK(API_LIB(scale_i8i8o32)(p_weight_tmp, 1, p_weight, T, 0), "luna_scale_i8i8o32");
         }
-        ret |= API_LIB(mul_i32i32o32)(p_y1, p_weight, p_y2, T, 0);
-        ret |= API_LIB(add_i32i32o8)(p_y2, p_bias_tmp, p_dst_once, T, shift);
+        THINKER_RET_CHECK(API_LIB(mul_i32i32o32)(p_y1, p_weight, p_y2, T, 0), "luna_mul_i32i32o32");
+        THINKER_RET_CHECK(API_LIB(add_i32i32o8)(p_y2, p_bias_tmp, p_dst_once, T, shift), "luna_add_i32i32o8");
         
         // Copy result back if necessary
         if (Y->mem_.mem_type_ != 2) {
@@ -276,6 +275,6 @@ int32_t layernormalint_venus(const tTensor *X, const tTensor *W, const tTensor *
         }
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 #endif

@@ -24,7 +24,6 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     
     // Get FFN attributes
     FFNIntAttrs *attrs = (FFNIntAttrs *)((int8_t *)op + op->attr_offset_);
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
     
     // Get all tensor pointers
     tTensor *input    = tensors[0];
@@ -46,7 +45,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     }
     
     // Call hardware-specific FFN implementation
-    ret = ffnint_luna(input, weight1, bias1, weight2, bias2, workspace, output, attrs);
+    THINKER_RET_CHECK(ffnint_luna(input, weight1, bias1, weight2, bias2, workspace, output, attrs), "ffnint_luna");
     
 #if THINKER_PROFILE
     uint64_t finish_t = tick_count();
@@ -55,7 +54,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
 #endif
 #endif
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #include "core/operator_template.h"

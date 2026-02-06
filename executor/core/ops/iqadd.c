@@ -31,7 +31,6 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     
     // Get binary operation attributes
     iqBinaryAttrs *attrs = (iqBinaryAttrs *)((int8_t *)op + op->attr_offset_);
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
     
 #if THINKER_USE_VENUS || THINKER_USE_ARCS || THINKER_USE_VENUSA
 #if THINKER_PROFILE
@@ -45,7 +44,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     }
     
     // Call hardware-specific addition implementation
-    ret = iqadd_luna(tensors[0], tensors[1], workspace, tensors[op->num_input_]);
+    THINKER_RET_CHECK(iqadd_luna(tensors[0], tensors[1], workspace, tensors[op->num_input_]), "iqadd_luna");
 
 #if THINKER_PROFILE
     uint64_t finish_t = tick_count();
@@ -55,7 +54,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
 
 #endif
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #include "core/operator_template.h"

@@ -24,7 +24,6 @@
  * @return int32_t Operation status
  */
 int32_t topn_luna(tTensor *X, tTensor *Index, tTensor *Y, tTensor *work_space, topNAttrs *attrs) {
-    int32_t ret = -1;
     int32_t axis = attrs->dim;
     int32_t n = attrs->max_num;
     int32_t n_dims = X->shape_.ndim_;
@@ -48,7 +47,7 @@ int32_t topn_luna(tTensor *X, tTensor *Index, tTensor *Y, tTensor *work_space, t
 
             for (int i = 0; i < leading; ++i) {
                 int8_t *p_src = (int8_t *)X->dptr_ + i * once_size;
-                ret = API_LIB(max_q7)(p_src, p_tmp, once_size);
+                THINKER_RET_CHECK(API_LIB(max_q7)(p_src, p_tmp, once_size), "luna_max_q7");
                 p_dst_val[i] = (int16_t)p_tmp[0];
                 p_dst_idx[i] = (int16_t)(p_tmp[1] + idx_offset);
             }
@@ -56,10 +55,10 @@ int32_t topn_luna(tTensor *X, tTensor *Index, tTensor *Y, tTensor *work_space, t
         }
         default:
             THINKER_LOG_FATAL("Only top 1 is supported currently.");
-            return -1;
+            return T_ERR_INVALID_PARA;
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif

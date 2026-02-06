@@ -28,13 +28,11 @@
 int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_List *list) {
     CHECK_EQ(num_tensor, (op->num_input_ + op->num_output_));  // Validate tensor count
     
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
-
 #if THINKER_USE_VENUS || THINKER_USE_ARCS || THINKER_USE_VENUSA
 #if THINKER_PROFILE
     uint64_t start_t = tick_count();  // Start profiling
 #endif
-    ret = reshape_luna(tensors[0], tensors[op->num_input_]);  // Execute Reshape operation
+    THINKER_RET_CHECK(reshape_luna(tensors[0], tensors[op->num_input_]), "reshape_luna");  // Execute Reshape operation
     
 #if THINKER_PROFILE
     uint64_t finish_t = tick_count();
@@ -43,7 +41,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
 #endif
 #endif
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #include "core/operator_template.h"

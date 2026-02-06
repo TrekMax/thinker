@@ -33,7 +33,7 @@ extern "C" {
  * @param idx: Version index
  * @return: Version string
  */
-THINKER_API(const char *, tGetVersion, (const int8_t idx));
+THINKER_API(const char *, tGetVersion, (const int8_t index));
 
 /**
  * Initialize the THINKER system
@@ -56,7 +56,7 @@ THINKER_API(tStatus, tUninitialize, ());
  * @return: Status code
  */
 THINKER_API(tStatus, tGetMemoryPlan,
-            (tMemory * memory, int32_t *num_memory, const int8_t *res,
+            (tMemory* memory_list, int32_t* num_memory, const int8_t* res,
              const uint64_t size));
 
 /**
@@ -69,22 +69,22 @@ THINKER_API(tStatus, tGetMemoryPlan,
  * @return: Status code
  */
 THINKER_API(tStatus, tModelInit,
-            (tModelHandle * model, const int8_t *res, const uint64_t size,
-             const tMemory *memory, int32_t num_memory));
+            (tModelHandle* hdl, const int8_t* res, const uint64_t size,
+             const tMemory* memory_list, const int32_t num_memory));
 
 /**
  * Finalize model
  * @param model: Model handle
  * @return: Status code
  */
-THINKER_API(tStatus, tModelFini, (tModelHandle model));
+THINKER_API(tStatus, tModelFini, (tModelHandle hdl));
 
 /**
  * Get number of input tensors
- * @param model: Model handle
+ * @param hdl: Model handle
  * @return: Number of input tensors
  */
-THINKER_API(int32_t, tGetInputCount, (const tModelHandle model));
+THINKER_API(int32_t, tGetInputCount, (const tModelHandle hdl));
 
 /**
  * Get input tensor name by index
@@ -92,15 +92,15 @@ THINKER_API(int32_t, tGetInputCount, (const tModelHandle model));
  * @param idx: Input index
  * @return: Input tensor name
  */
-THINKER_API(const char *, tGetInputName,
-            (const tModelHandle model, const int32_t idx));
+THINKER_API(const char*, tGetInputName,
+            (const tModelHandle hdl, const int32_t idx));
 
 /**
  * Get number of output tensors
  * @param model: Model handle
  * @return: Number of output tensors
  */
-THINKER_API(int32_t, tGetOutputCount, (const tModelHandle model));
+THINKER_API(int32_t, tGetOutputCount, (const tModelHandle hdl));
 
 /**
  * Get output tensor name by index
@@ -108,8 +108,8 @@ THINKER_API(int32_t, tGetOutputCount, (const tModelHandle model));
  * @param idx: Output index
  * @return: Output tensor name
  */
-THINKER_API(const char *, tGetOutputName,
-            (const tModelHandle model, const int32_t idx));
+THINKER_API(const char*, tGetOutputName,
+            (const tModelHandle hdl, const int32_t idx));
 
 /**
  * Get input tensor information
@@ -128,7 +128,7 @@ THINKER_API(tStatus, tGetInputInfo,
  * @return: Data type
  */
 THINKER_API(tDType, tGetInputDataType,
-            (const tModelHandle model, const int32_t idx));
+            (const tModelHandle hdl, const int32_t idx));
 
 /**
  * Get output data type
@@ -137,7 +137,7 @@ THINKER_API(tDType, tGetInputDataType,
  * @return: Data type
  */
 THINKER_API(tDType, tGetOutputDataType,
-            (const tModelHandle model, const int32_t idx));
+            (const tModelHandle hdl, const int32_t idx));
 
 /**
  * Get input tensor shape
@@ -146,7 +146,7 @@ THINKER_API(tDType, tGetOutputDataType,
  * @return: Tensor shape
  */
 THINKER_API(tShape, tGetInputShape,
-            (const tModelHandle model, const int32_t idx));
+            (const tModelHandle hdl, const int32_t idx));
 
 /**
  * Get output tensor shape
@@ -155,7 +155,7 @@ THINKER_API(tShape, tGetInputShape,
  * @return: Tensor shape
  */
 THINKER_API(tShape, tGetOutputShape,
-            (const tModelHandle model, const int32_t idx));
+            (const tModelHandle hdl, const int32_t idx));
 
 /**
  * Create executor instance
@@ -166,7 +166,7 @@ THINKER_API(tShape, tGetOutputShape,
  * @return: Status code
  */
 THINKER_API(tStatus, tCreateExecutor,
-            (const tModelHandle model, tExecHandle *hdl,
+            (const tModelHandle model_hdl, tExecHandle *hdl,
              const tMemory *memory_list, const int32_t num_memory));
 
 /**

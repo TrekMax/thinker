@@ -25,7 +25,6 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     // Validate tensor count
     CHECK_EQ(num_tensor, (op->num_input_ + op->num_output_ + 1));
     
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
     GluIntAttrs *attrs = (GluIntAttrs *)((int8_t *)op + op->attr_offset_);
     
 #if THINKER_USE_ARCS || THINKER_USE_VENUSA
@@ -34,7 +33,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
 #endif
     
     // Call hardware-specific GLU implementation
-    ret = gluint_luna(tensors[0], tensors[op->num_input_], tensors[op->num_input_ + 1], attrs);
+    THINKER_RET_CHECK(gluint_luna(tensors[0], tensors[op->num_input_], tensors[op->num_input_ + 1], attrs), "gluint_luna");
     
 #if THINKER_PROFILE
     uint64_t finish_t = tick_count();
@@ -44,7 +43,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
 
 #endif
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #include "core/operator_template.h"

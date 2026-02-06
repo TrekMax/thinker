@@ -84,8 +84,6 @@ static void luna_meanpool_para_init(PoolAttrs* attrs, s_conv_struct *conv_attrs,
  */
 int32_t avgpool2dint_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs *attrs)
 {
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
-
     if (Int8 == X->dtype_) {
         s_conv_struct pool_struct_;
         luna_meanpool_para_init(attrs, &pool_struct_, (tTensor *)X, Y);
@@ -118,16 +116,16 @@ int32_t avgpool2dint_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs
                     for (int32_t n = 0; n < batch; n++) {
                         int8_t *p_in = (int8_t *)X->dptr_ + n * in_batch_size;
                         int8_t *p_out = (int8_t *)Y->dptr_ + n * ou_batch_size;
-                        ret = API_LIB(memset)(p_tmp, 1, in_h * in_w);
-                        ret = API_LIB(mat_mul_q7_int16)(p_in, (int8_t *)p_tmp, (int16_t *)p_tmp, in_c, in_h * in_w, 1, 0);
-                        ret |= API_LIB(scale_q15_int8)((int16_t *)p_tmp, 1, p_out, ou_batch_size, shift);
+                        THINKER_RET_CHECK(API_LIB(memset)(p_tmp, 1, in_h * in_w), "luna_memset");
+                        THINKER_RET_CHECK(API_LIB(mat_mul_q7_int16)(p_in, (int8_t *)p_tmp, (int16_t *)p_tmp, in_c, in_h * in_w, 1, 0), "luna_mat_mul_q7_int16");
+                        THINKER_RET_CHECK(API_LIB(scale_q15_int8)((int16_t *)p_tmp, 1, p_out, ou_batch_size, shift), "luna_scale_q15_int8");
                     }
                 } else {
                     for (int32_t n = 0; n < batch; n++) {
                         int8_t *p_in = (int8_t *)X->dptr_ + n * in_batch_size;
                         int8_t *p_out = (int8_t *)Y->dptr_ + n * ou_batch_size;
-                        ret = API_LIB(mean_pooling_int16)(p_in, (int16_t *)p_tmp, &pool_struct_);
-                        ret |= API_LIB(scale_q15_int8)(p_tmp, 1, p_out, ou_batch_size, shift);
+                        THINKER_RET_CHECK(API_LIB(mean_pooling_int16)(p_in, (int16_t *)p_tmp, &pool_struct_), "luna_mean_pooling_int16");
+                        THINKER_RET_CHECK(API_LIB(scale_q15_int8)(p_tmp, 1, p_out, ou_batch_size, shift), "luna_scale_q15_int8");
                     }
                 }
             } else {
@@ -140,11 +138,11 @@ int32_t avgpool2dint_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs
                         int8_t *p_in = (int8_t *)X->dptr_ + n * in_batch_size;
                         int8_t *p_out = (int8_t *)Y->dptr_ + n * ou_batch_size;
                         API_LIB(memset)(p_tmp1, 1, in_h * in_w);
-                        ret = API_LIB(mat_mul_q7_int32)(p_in, (int8_t *)p_tmp1, (int32_t *)p_tmp2, pool_struct_.input_c, in_h * in_w, 1, 0);
-                        ret |= API_LIB(memset)(p_out, 1, ou_batch_size);
-                        ret |= API_LIB(scale_q7_int32)(p_out, one_kernel_size, (int32_t *)p_tmp1, ou_batch_size, 0);
-                        ret |= API_LIB(div_q31_int32)(p_tmp2, q_x, p_tmp1, 0, p_tmp1, q_o, ou_batch_size);
-                        ret |= API_LIB(scale_q31_int8)(p_tmp1, 1, p_out, ou_batch_size, 0);
+                        THINKER_RET_CHECK(API_LIB(mat_mul_q7_int32)(p_in, (int8_t *)p_tmp1, (int32_t *)p_tmp2, pool_struct_.input_c, in_h * in_w, 1, 0), "luna_mat_mul_q7_int32");
+                        THINKER_RET_CHECK(API_LIB(memset)(p_out, 1, ou_batch_size), "luna_memset");
+                        THINKER_RET_CHECK(API_LIB(scale_q7_int32)(p_out, one_kernel_size, (int32_t *)p_tmp1, ou_batch_size, 0), "luna_scale_q7_int32");
+                        THINKER_RET_CHECK(API_LIB(div_q31_int32)(p_tmp2, q_x, p_tmp1, 0, p_tmp1, q_o, ou_batch_size), "luna_div_q32_int32");
+                        THINKER_RET_CHECK(API_LIB(scale_q31_int8)(p_tmp1, 1, p_out, ou_batch_size, 0), "luna_scale_q32_int8");
                     }
                 } else {
                     int32_t *p_tmp1 = (int32_t *)Temp->dptr_;
@@ -152,17 +150,17 @@ int32_t avgpool2dint_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs
                     for (int32_t n = 0; n < batch; n++) {
                         int8_t *p_in = (int8_t *)X->dptr_ + n * in_batch_size;
                         int8_t *p_out = (int8_t *)Y->dptr_ + n * ou_batch_size;
-                        ret = API_LIB(mean_pooling_int16)(p_in, (int16_t *)p_tmp1, &pool_struct_);
-                        ret |= API_LIB(scale_q15_int32)((int16_t *)p_tmp1, 1, (int32_t *)p_tmp2, ou_batch_size, 0);
-                        ret |= API_LIB(memset)(p_out, 1, ou_batch_size);
-                        ret |= API_LIB(scale_q7_int32)(p_out, one_kernel_size, (int32_t *)p_tmp1, ou_batch_size, 0);
-                        ret |= API_LIB(div_q31_int32)(p_tmp2, q_x, p_tmp1, 0, p_tmp1, q_o, ou_batch_size);
-                        ret |= API_LIB(scale_q31_int8)(p_tmp1, 1, p_out, ou_batch_size, 0);
+                        THINKER_RET_CHECK(API_LIB(mean_pooling_int16)(p_in, (int16_t *)p_tmp1, &pool_struct_), "luna_mean_pooling_int16");
+                        THINKER_RET_CHECK(API_LIB(scale_q15_int32)((int16_t *)p_tmp1, 1, (int32_t *)p_tmp2, ou_batch_size, 0), "luna_scale_q15_int32");
+                        THINKER_RET_CHECK(API_LIB(memset)(p_out, 1, ou_batch_size), "luna_memset");
+                        THINKER_RET_CHECK(API_LIB(scale_q7_int32)(p_out, one_kernel_size, (int32_t *)p_tmp1, ou_batch_size, 0), "luna_scale_q7_int32");
+                        THINKER_RET_CHECK(API_LIB(div_q31_int32)(p_tmp2, q_x, p_tmp1, 0, p_tmp1, q_o, ou_batch_size), "luna_div_q31_int32");
+                        THINKER_RET_CHECK(API_LIB(scale_q31_int8)(p_tmp1, 1, p_out, ou_batch_size, 0), "luna_scale_q31_int8");
                     }
                 }
             }
         } else {
-            int32_t split_num = floor(in_c / 8);
+            int32_t split_num = (int)floor(in_c / 8);
             int32_t s_num = in_c - split_num * 8;
             int32_t n = 0;
             if (0 == (one_kernel_size & (one_kernel_size - 1))) {
@@ -173,32 +171,32 @@ int32_t avgpool2dint_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs
                         int8_t *p_in = (int8_t *)X->dptr_ + n * in_channel_size * 8;
                         int8_t *p_out = (int8_t *)Y->dptr_ + n * ou_channel_size * 8;
                         pool_struct_.input_c = 8;
-                        API_LIB(memset)(p_tmp, 1, in_h * in_w);
-                        ret = API_LIB(mat_mul_q7_int32)(p_in, (int8_t *)p_tmp, (int32_t *)p_tmp, 8, in_h * in_w, 1, 0);
-                        ret |= API_LIB(scale_q31_int8)((int32_t *)p_tmp, 1, p_out, 8 * ou_channel_size, shift);
+                        THINKER_RET_CHECK(API_LIB(memset)(p_tmp, 1, in_h * in_w), "luna_memset");
+                        THINKER_RET_CHECK(API_LIB(mat_mul_q7_int32)(p_in, (int8_t *)p_tmp, (int32_t *)p_tmp, 8, in_h * in_w, 1, 0), "luna_mat_mul_q7_int32");
+                        THINKER_RET_CHECK(API_LIB(scale_q31_int8)((int32_t *)p_tmp, 1, p_out, 8 * ou_channel_size, shift), "luna_scale_q31_int8");
                     }
                     if (0 != s_num) {
                         int8_t *p_in = (int8_t *)X->dptr_ + in_channel_size * (split_num - 1) * 8;
                         int8_t *p_out = (int8_t *)Y->dptr_ + ou_channel_size * (split_num - 1) * 8;
                         pool_struct_.input_c = s_num;
-                        API_LIB(memset)(p_tmp, 1, in_h * in_w);
-                        ret = API_LIB(mat_mul_q7_int32)(p_in, (int8_t *)p_tmp, (int32_t *)p_tmp, s_num, in_h * in_w, 1, 0);
-                        ret |= API_LIB(scale_q31_int8)((int32_t *)p_tmp, 1, p_out, s_num * ou_channel_size, shift);
+                        THINKER_RET_CHECK(API_LIB(memset)(p_tmp, 1, in_h * in_w), "luna_memset");
+                        THINKER_RET_CHECK(API_LIB(mat_mul_q7_int32)(p_in, (int8_t *)p_tmp, (int32_t *)p_tmp, s_num, in_h * in_w, 1, 0), "luna_mat_mul_q7_int32");
+                        THINKER_RET_CHECK(API_LIB(scale_q31_int8)((int32_t *)p_tmp, 1, p_out, s_num * ou_channel_size, shift), "luna_scale_q31_int8");
                     }
                 } else {
                     for (n = 0; n < split_num; n++) {
                         int8_t *p_in = (int8_t *)X->dptr_ + n * in_channel_size * 8;
                         int8_t *p_out = (int8_t *)Y->dptr_ + n * ou_channel_size * 8;
                         pool_struct_.input_c = 8;
-                        ret = API_LIB(mean_pooling_int16)(p_in, (int16_t *)p_tmp, &pool_struct_);
-                        ret |= API_LIB(scale_q15_int8)(p_tmp, 1, p_out, 8 * ou_channel_size, shift);
+                        THINKER_RET_CHECK(API_LIB(mean_pooling_int16)(p_in, (int16_t *)p_tmp, &pool_struct_), "luna_mean_pooling_int16");
+                        THINKER_RET_CHECK(API_LIB(scale_q15_int8)(p_tmp, 1, p_out, 8 * ou_channel_size, shift), "luna_scale_q15_int8");
                     }
                     if (0 != s_num) {
                         int8_t *p_in = (int8_t *)X->dptr_ + in_channel_size * (split_num - 1) * 8;
                         int8_t *p_out = (int8_t *)Y->dptr_ + ou_channel_size * (split_num - 1) * 8;
                         pool_struct_.input_c = s_num;
-                        ret = API_LIB(mean_pooling_int16)(p_in, (int16_t *)p_tmp, &pool_struct_);
-                        ret |= API_LIB(scale_q15_int8)(p_tmp, 1, p_out, s_num * ou_channel_size, shift);
+                        THINKER_RET_CHECK(API_LIB(mean_pooling_int16)(p_in, (int16_t *)p_tmp, &pool_struct_), "luna_mean_pooling_int16");
+                        THINKER_RET_CHECK(API_LIB(scale_q15_int8)(p_tmp, 1, p_out, s_num * ou_channel_size, shift), "luna_scale_q15_int8");
                     }
                 }
             } else {
@@ -211,23 +209,23 @@ int32_t avgpool2dint_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs
                         int8_t *p_in = (int8_t *)X->dptr_ + n * in_channel_size * 8;
                         int8_t *p_out = (int8_t *)Y->dptr_ + n * ou_channel_size * 8;
                         pool_struct_.input_c = 8;
-                        API_LIB(memset)(p_tmp1, 1, in_h * in_w);
-                        ret = API_LIB(mat_mul_q7_int32)(p_in, (int8_t *)p_tmp1, (int32_t *)p_tmp2, 8, in_h * in_w, 1, 0);
-                        ret |= API_LIB(memset)(p_out, 1, 8 * ou_channel_size);
-                        ret |= API_LIB(scale_q7_int32)(p_out, one_kernel_size, p_tmp1, 8 * ou_channel_size, 0);
-                        ret |= API_LIB(div_q31_int32)(p_tmp2, q_x, p_tmp1, 0, p_tmp1, q_o, 8 * ou_channel_size);
-                        ret |= API_LIB(scale_q31_int8)(p_tmp1, 1, p_out, 8 * ou_channel_size, 0);
+                        THINKER_RET_CHECK(API_LIB(memset)(p_tmp1, 1, in_h * in_w), "luna_memset");
+                        THINKER_RET_CHECK(API_LIB(mat_mul_q7_int32)(p_in, (int8_t *)p_tmp1, (int32_t *)p_tmp2, 8, in_h * in_w, 1, 0), "luna_mat_mul_q7_int32");
+                        THINKER_RET_CHECK(API_LIB(memset)(p_out, 1, 8 * ou_channel_size), "luna_memset");
+                        THINKER_RET_CHECK(API_LIB(scale_q7_int32)(p_out, one_kernel_size, p_tmp1, 8 * ou_channel_size, 0), "luna_scale_q7_int32");
+                        THINKER_RET_CHECK(API_LIB(div_q31_int32)(p_tmp2, q_x, p_tmp1, 0, p_tmp1, q_o, 8 * ou_channel_size), "luna_div_q31_int32");
+                        THINKER_RET_CHECK(API_LIB(scale_q31_int8)(p_tmp1, 1, p_out, 8 * ou_channel_size, 0), "luna_scale_q31_int8");
                     }
                     if (0 != s_num) {
                         int8_t *p_in = (int8_t *)X->dptr_ + 8 * in_channel_size * (split_num - 1);
                         int8_t *p_out = (int8_t *)Y->dptr_ + 8 * ou_channel_size * (split_num - 1);
                         pool_struct_.input_c = s_num;
-                        API_LIB(memset)(p_tmp1, 1, in_h * in_w);
-                        ret = API_LIB(mat_mul_q7_int32)(p_in, (int8_t *)p_tmp1, (int32_t *)p_tmp2, s_num, in_h * in_w, 1, 0);
-                        ret |= API_LIB(memset)(p_out, 1, s_num * ou_channel_size);
-                        ret |= API_LIB(scale_q7_int32)(p_out, one_kernel_size, p_tmp1, s_num * ou_channel_size, 0);
-                        ret |= API_LIB(div_q31_int32)(p_tmp2, q_x, p_tmp1, 0, p_tmp1, q_o, s_num * ou_channel_size);
-                        ret |= API_LIB(scale_q31_int8)(p_tmp1, 1, p_out, s_num * ou_channel_size, 0);
+                        THINKER_RET_CHECK(API_LIB(memset)(p_tmp1, 1, in_h * in_w), "luna_memset");
+                        THINKER_RET_CHECK(API_LIB(mat_mul_q7_int32)(p_in, (int8_t *)p_tmp1, (int32_t *)p_tmp2, s_num, in_h * in_w, 1, 0), "luna_mat_mul_q7_int32");
+                        THINKER_RET_CHECK(API_LIB(memset)(p_out, 1, s_num * ou_channel_size), "luna_memset");
+                        THINKER_RET_CHECK(API_LIB(scale_q7_int32)(p_out, one_kernel_size, p_tmp1, s_num * ou_channel_size, 0), "luna_scale_q7_int32");
+                        THINKER_RET_CHECK(API_LIB(div_q31_int32)(p_tmp2, q_x, p_tmp1, 0, p_tmp1, q_o, s_num * ou_channel_size), "luna_div_q31_int32");
+                        THINKER_RET_CHECK(API_LIB(scale_q31_int8)(p_tmp1, 1, p_out, s_num * ou_channel_size, 0), "luna_scale_q31_int8");
                     }
                 } else {
                     int32_t *p_tmp1 = (int32_t *)Temp->dptr_;
@@ -236,29 +234,29 @@ int32_t avgpool2dint_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs
                         int8_t *p_in = (int8_t *)X->dptr_ + n * in_channel_size * 8;
                         int8_t *p_out = (int8_t *)Y->dptr_ + n * ou_channel_size * 8;
                         pool_struct_.input_c = 8;
-                        ret = API_LIB(mean_pooling_int16)(p_in, (int16_t *)p_tmp1, &pool_struct_);
-                        ret |= API_LIB(scale_q15_int32)((int16_t *)p_tmp1, 1, p_tmp2, 8 * ou_channel_size, 0);
-                        ret |= API_LIB(memset)(p_out, 1, 8 * ou_channel_size);
-                        ret |= API_LIB(scale_q7_int32)(p_out, one_kernel_size, p_tmp1, 8 * ou_channel_size, 0);
-                        ret |= API_LIB(div_q31_int32)(p_tmp2, q_x, p_tmp1, 0, p_tmp1, q_o, 8 * ou_channel_size);
-                        ret |= API_LIB(scale_q31_int8)(p_tmp1, 1, p_out, 8 * ou_channel_size, 0);
+                        THINKER_RET_CHECK(API_LIB(mean_pooling_int16)(p_in, (int16_t *)p_tmp1, &pool_struct_), "luna_mean_pooling_int16");
+                        THINKER_RET_CHECK(API_LIB(scale_q15_int32)((int16_t *)p_tmp1, 1, p_tmp2, 8 * ou_channel_size, 0), "luna_scale_q15_int32");
+                        THINKER_RET_CHECK(API_LIB(memset)(p_out, 1, 8 * ou_channel_size), "luna_memset");
+                        THINKER_RET_CHECK(API_LIB(scale_q7_int32)(p_out, one_kernel_size, p_tmp1, 8 * ou_channel_size, 0), "luna_scale_q7_int32");
+                        THINKER_RET_CHECK(API_LIB(div_q31_int32)(p_tmp2, q_x, p_tmp1, 0, p_tmp1, q_o, 8 * ou_channel_size), "luna_div_q31_int32");
+                        THINKER_RET_CHECK(API_LIB(scale_q31_int8)(p_tmp1, 1, p_out, 8 * ou_channel_size, 0), "luna_scale_q31_int8");
                     }
                     if (0 != s_num) {
                         int8_t *p_in = (int8_t *)X->dptr_ + 8 * in_channel_size * (split_num - 1);
                         int8_t *p_out = (int8_t *)Y->dptr_ + 8 * ou_channel_size * (split_num - 1);
                         pool_struct_.input_c = s_num;
-                        ret = API_LIB(mean_pooling_int16)(p_in, (int16_t *)p_tmp1, &pool_struct_);
-                        ret |= API_LIB(scale_q15_int32)((int16_t *)p_tmp1, 1, p_tmp2, s_num * ou_channel_size, 0);
-                        ret |= API_LIB(memset)(p_out, 1, s_num * ou_channel_size);
-                        ret |= API_LIB(scale_q7_int32)(p_out, one_kernel_size, p_tmp1, s_num * ou_channel_size, 0);
-                        ret |= API_LIB(div_q31_int32)(p_tmp2, q_x, p_tmp1, 0, p_tmp1, q_o, s_num * ou_channel_size);
-                        ret |= API_LIB(scale_q31_int8)(p_tmp1, 1, p_out, s_num * ou_channel_size, 0);
+                        THINKER_RET_CHECK(API_LIB(mean_pooling_int16)(p_in, (int16_t *)p_tmp1, &pool_struct_), "luna_mean_pooling_int16");
+                        THINKER_RET_CHECK(API_LIB(scale_q15_int32)((int16_t *)p_tmp1, 1, p_tmp2, s_num * ou_channel_size, 0), "luna_scale_q15_int32");
+                        THINKER_RET_CHECK(API_LIB(memset)(p_out, 1, s_num * ou_channel_size), "luna_memset");
+                        THINKER_RET_CHECK(API_LIB(scale_q7_int32)(p_out, one_kernel_size, p_tmp1, s_num * ou_channel_size, 0), "luna_scale_q7_int32");
+                        THINKER_RET_CHECK(API_LIB(div_q31_int32)(p_tmp2, q_x, p_tmp1, 0, p_tmp1, q_o, s_num * ou_channel_size), "luna_div_q31_int32");
+                        THINKER_RET_CHECK(API_LIB(scale_q31_int8)(p_tmp1, 1, p_out, s_num * ou_channel_size, 0), "luna_scale_q31_int8");
                     }
                 }
             }
         }
     }
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif  //_AVGPOOL2DINT_VENUS_H_

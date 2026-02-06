@@ -22,9 +22,7 @@
  * @param Workspace Workspace buffer
  * @return Operation result status
  */
-tStatus relu_luna(tTensor *X, tTensor *Y, tTensor *Workspace) 
-{
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
+tStatus relu_luna(tTensor *X, tTensor *Y, tTensor *Workspace) {
     uint32_t size = getShapeSize(&(X->shape_));
     uint32_t workspace_size = Workspace ? getShapeSize(&(Workspace->shape_)) : 0;
     
@@ -37,7 +35,7 @@ tStatus relu_luna(tTensor *X, tTensor *Y, tTensor *Workspace)
 
         // Handle PSRAM input
         if (2 != X->mem_.type_) { // X is psram
-            ret = API_LIB(memcpy_i8o8)((int8_t *)Workspace->dptr_, src, size);
+            THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)Workspace->dptr_, src, size), "luna_memcpy_i8o8");
             if (size > workspace_size)
                 return T_ERR_NO_WORKSPACE;
             src = (int8_t *)Workspace->dptr_;
@@ -50,7 +48,7 @@ tStatus relu_luna(tTensor *X, tTensor *Y, tTensor *Workspace)
             dst = (int8_t *)Workspace->dptr_;
         }
 
-        ret = API_LIB(relu_i8o8)(src, dst, size, shift);
+        THINKER_RET_CHECK(API_LIB(relu_i8o8)(src, dst, size, shift), "luna_relu_i8o8");
         if (2 != Y->mem_.type_) {
             opi_psram_cpy_out((int8_t *)Y->dptr_, dst, size);
         }
@@ -63,7 +61,7 @@ tStatus relu_luna(tTensor *X, tTensor *Y, tTensor *Workspace)
         if (2 != X->mem_.type_) { // X is psram
             if (size > workspace_size)
                 return T_ERR_NO_WORKSPACE;
-            ret = API_LIB(memcpy_i8o8)((int8_t *)Workspace->dptr_, src, size);
+            THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)Workspace->dptr_, src, size), "luna_memcpy_i8o8");
             src = (int8_t *)Workspace->dptr_;
         }
         
@@ -73,7 +71,7 @@ tStatus relu_luna(tTensor *X, tTensor *Y, tTensor *Workspace)
             dst = (int32_t *)Workspace->dptr_;
         }
         
-        ret = API_LIB(relu_i8o32)(src, dst, size, shift);
+        THINKER_RET_CHECK(API_LIB(relu_i8o32)(src, dst, size, shift), "luna_relu_i8o32");
 
         if (2 != Y->mem_.type_) {
             opi_psram_cpy_out((int8_t *)Y->dptr_, dst, size * 4);
@@ -85,14 +83,14 @@ tStatus relu_luna(tTensor *X, tTensor *Y, tTensor *Workspace)
         int8_t *dst = (int8_t *)Y->dptr_;
 
         if (2 != X->mem_.type_) { // X is psram
-            ret = API_LIB(memcpy_i8o8)((int8_t *)Workspace->dptr_, (int8_t *)src, size * 4);
+            THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)Workspace->dptr_, (int8_t *)src, size * 4), "luna_memcpy_i8o8");
             src = (int32_t *)Workspace->dptr_;
         }
         
         if (2 != Y->mem_.type_)
             dst = (int8_t *)Workspace->dptr_;
 
-        ret = API_LIB(relu_i32o8)(src, dst, size, shift);
+        THINKER_RET_CHECK(API_LIB(relu_i32o8)(src, dst, size, shift), "luna_relu_i32o8");
 
         if (2 != Y->mem_.type_) {
             opi_psram_cpy_out((int8_t *)Y->dptr_, dst, size);
@@ -104,14 +102,14 @@ tStatus relu_luna(tTensor *X, tTensor *Y, tTensor *Workspace)
         int32_t *dst = (int32_t *)Y->dptr_;
 
         if (2 != X->mem_.type_) { // X is psram
-            ret = API_LIB(memcpy_i8o8)((int8_t *)Workspace->dptr_, (int8_t *)src, size * 4);
+            THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)Workspace->dptr_, (int8_t *)src, size * 4), "luna_memcpy_i8o8");
             src = (int32_t *)Workspace->dptr_;
         }
         
         if (2 != Y->mem_.type_)
             dst = (int32_t *)Workspace->dptr_;
 
-        ret = API_LIB(relu_i32o32)(src, dst, size, shift);
+        THINKER_RET_CHECK(API_LIB(relu_i32o32)(src, dst, size, shift), "luna_relu_i32o32");
 
         if (2 != Y->mem_.type_) {
             opi_psram_cpy_out((int8_t *)Y->dptr_, dst, size * 4);
@@ -121,7 +119,7 @@ tStatus relu_luna(tTensor *X, tTensor *Y, tTensor *Workspace)
         return T_ERR_INVALID_DATATYPE;
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif

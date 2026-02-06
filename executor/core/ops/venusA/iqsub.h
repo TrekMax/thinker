@@ -22,8 +22,6 @@
  * @return int32_t Operation status
  */
 int32_t iqsub_luna(tTensor *X1, tTensor *X2, tTensor *Temp, tTensor *Y) {
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
-
     // Check if input tensors have the same shape and data type
     if (!equalShape(&X1->shape_, &X2->shape_) || X1->dtype_ != X2->dtype_) {
         return T_ERR_INVALID_DATATYPE;
@@ -59,19 +57,19 @@ int32_t iqsub_luna(tTensor *X1, tTensor *X2, tTensor *Temp, tTensor *Y) {
     // Process each tensor based on memory type and quantization
     if (x1InPSram) {
         src1 = (int8_t *)Temp->dptr_;
-        ret = API_LIB(memcpy_i8o8)(src1, (int8_t *)X1->dptr_, size * sizeof(int8_t));
+        THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(src1, (int8_t *)X1->dptr_, size * sizeof(int8_t)), "luna_memcpy_i8o8");
     }
     if (x1_q != y_q) {
-        ret = API_LIB(scale_i8i8o8)(src1, 1, (int8_t *)Temp->dptr_, size, shift1);
+        THINKER_RET_CHECK(API_LIB(scale_i8i8o8)(src1, 1, (int8_t *)Temp->dptr_, size, shift1), "luna_scale_i8i8o8");
         src1 = (int8_t *)Temp->dptr_;
     }
 
     if (x2InPSram) {
         src2 = (int8_t *)Temp->dptr_ + ((x1InPSram || x1_q != y_q) ? size : 0);
-        ret = API_LIB(memcpy_i8o8)(src2, (int8_t *)X2->dptr_, size * sizeof(int8_t));
+        THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(src2, (int8_t *)X2->dptr_, size * sizeof(int8_t)), "luna_memcpy_i8o8");
     }
     if (x2_q != y_q) {
-        ret = API_LIB(scale_i8i8o8)(src2, 1, (int8_t *)(Temp->dptr_ + ((x1InPSram || x1_q != y_q) ? size : 0)), size, shift2);
+        THINKER_RET_CHECK(API_LIB(scale_i8i8o8)(src2, 1, (int8_t *)(Temp->dptr_ + ((x1InPSram || x1_q != y_q) ? size : 0)), size, shift2), "luna_scale_i8i8o8");
         src2 = (int8_t *)Temp->dptr_ + ((x1InPSram || x1_q != y_q) ? size : 0);
     }
 
@@ -79,14 +77,14 @@ int32_t iqsub_luna(tTensor *X1, tTensor *X2, tTensor *Temp, tTensor *Y) {
     if (yInPSram) {
         dst = (int8_t *)Temp->dptr_;
     }
-    ret = API_LIB(sub_i8i8o8)(dst, src2, dst, size, 0);
+    THINKER_RET_CHECK(API_LIB(sub_i8i8o8)(dst, src2, dst, size, 0), "luna_sub_i8i8o8");
 
     // Copy result to PSram if necessary
     if (yInPSram) {
         opi_psram_cpy_out((void *)Y->dptr_, dst, size * sizeof(int8_t));
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif  // _SUB_LUNA_H_

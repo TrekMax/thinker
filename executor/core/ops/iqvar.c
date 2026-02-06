@@ -32,7 +32,6 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     
     // Get variance attributes
     iqvarAttrs *attrs = (iqvarAttrs *)((int8_t *)op + op->attr_offset_);
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
     
     // Get input, output, and workspace tensors
     tTensor *X = ((tTensor **)tensors)[0];
@@ -45,7 +44,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
 #endif
 
     // Call hardware-specific variance implementation
-    ret = iqvar_luna(X, Y, workspace, attrs);
+    THINKER_RET_CHECK(iqvar_luna(X, Y, workspace, attrs), "iqvar_luna");
 
 #if THINKER_PROFILE
     uint64_t finish_t = tick_count();
@@ -54,7 +53,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
 #endif
 #endif
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #include "core/operator_template.h"

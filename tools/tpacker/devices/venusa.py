@@ -9,7 +9,7 @@ VENUSA_CONFIGS = {
         "ArgMax", "Conv1dInt", "Conv2dInt", "ConvTranspose2dInt",
         "Relu", "Prelu", "Clip", "MaxPool", "AvgPool2dInt",
         "LinearInt", "GRUInt", "LSTMInt", "BmmInt",
-        "iqSigmoid", "Sigmoid", "iqTanh", "Tanh",
+        "iqSigmoid", "iqTanh",
         "iqCat", "iqPad", "Transpose", "Reshape",
         "Squeeze", "Unsqueeze", "Flatten", "Slice",
         "iqSum", "iqSub", "iqAdd", "iqMul", "iqDiv",

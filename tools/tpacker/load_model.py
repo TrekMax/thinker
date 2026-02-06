@@ -2,6 +2,7 @@
 # All rights reserved.
 # Created by leifang on 2022.09.31
 
+import os
 import onnx
 import struct
 import numpy as np
@@ -136,6 +137,7 @@ def _convert_op_type(op_type: str) -> str:
         "QConv2d": "Conv2dInt",
         "QConvBN2d": "Conv2dInt",
         "QConvTranspose2d": "ConvTranspose2dInt",
+        "QConvTransposeBN2d": "ConvTranspose2dInt",
         "QAvgPool2d": "AvgPool2dInt",
         "QMaxPool2d": "MaxPool2dInt",
         "QGRU": "GRUInt",
@@ -148,7 +150,8 @@ def _convert_op_type(op_type: str) -> str:
         "QMul": "iqMul",
         "QSoftmax": "SoftmaxInt",
         "QLSTM":"LSTMInt",
-        "QGRU":"GRUInt"
+        "QGRU":"GRUInt",
+        "Pad":"iqPad"
     }
     return map_dict.get(op_type, op_type)
 
@@ -162,7 +165,7 @@ def _convert_from_onnx_model(graph_path: str, model_config: ModelConfig, is_dump
         "opset_imports": model.opset_import,
         "ir_version": model.ir_version,
     }
-    thinker_graph.name = graph_path.split("/")[-1].split(".")[0]
+    thinker_graph.name, _ = os.path.splitext(graph_path.split("/")[-1])
 
     params = {}
     for tensor in onnx_graph.initializer:

@@ -37,8 +37,6 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
         axis += tensors[0]->shape_.ndim_;
     }
     
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
-    
     // Check for workspace tensor
     tTensor *workspace = NULL;
     if (num_tensor == op->num_input_ + op->num_output_ + 1){
@@ -50,7 +48,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     uint64_t start_t = tick_count();
 #endif
     // Call hardware-specific concat implementation
-    ret = concat_luna(tensors, axis, op->num_input_, workspace, tensors[op->num_input_]);
+    THINKER_RET_CHECK(concat_luna(tensors, axis, op->num_input_, workspace, tensors[op->num_input_]), "cocat_luna");
 #if THINKER_PROFILE
     uint64_t finish_t = tick_count();
     uint32_t total_t = (uint32_t)(finish_t - start_t);
@@ -58,7 +56,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
 #endif
 #endif
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #include "core/operator_template.h"

@@ -22,8 +22,6 @@
  * @return Execution status
  */
 int32_t requant_luna(tTensor* X, tTensor* Y) {
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
-
     // Check if input data type is Int8
     if (X->dtype_ != Int8) {
         return T_ERR_INVALID_DATATYPE;
@@ -50,17 +48,16 @@ int32_t requant_luna(tTensor* X, tTensor* Y) {
                 output[i] = input[i] << (q_y - q_x);
             }
         }
-        ret = T_SUCCESS;
     } else if (dst_bits == src_bits) {
         int8_t* output = (int8_t*)Y->dptr_;
         int scale = (q_y - q_x) > 0 ? 1 << (q_y - q_x) : 1;
         int shift = (q_x - q_y) > 0 ? (q_x - q_y) : 0;
-        ret = API_LIB(scale_i8i8o8)(input, scale, output, size, shift);
+        THINKER_RET_CHECK(API_LIB(scale_i8i8o8)(input, scale, output, size, shift), "luna_scale_i8i8o8");
     } else {
-        ret = T_ERR_FAIL;
+        return T_ERR_FAIL;
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif

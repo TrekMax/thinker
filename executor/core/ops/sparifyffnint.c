@@ -23,7 +23,6 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     CHECK_GE(num_tensor, (op->num_input_ + op->num_output_));  // Validate tensor count
 
     SparifyFFNIntAttrs *attrs = (SparifyFFNIntAttrs *)((int8_t *)op + op->attr_offset_);
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
 
     // Input and output tensors
     tTensor *input = tensors[0];
@@ -43,7 +42,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     if (num_tensor == op->num_input_ + op->num_output_ + 1) {
         workspace = tensors[op->num_input_ + op->num_output_];
     }
-    ret = sparifyffnint_luna(input, weight1, bias1, weight2, bias2, weight3, bias3, workspace, output, attrs);
+    THINKER_RET_CHECK(sparifyffnint_luna(input, weight1, bias1, weight2, bias2, weight3, bias3, workspace, output, attrs), "sprifyffnint_luna");
 #if THINKER_PROFILE
     uint64_t finish_t = tick_count();
     uint32_t total_t = (uint32_t)(finish_t - start_t);
@@ -51,7 +50,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
 #endif
 #endif
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #include "core/operator_template.h"

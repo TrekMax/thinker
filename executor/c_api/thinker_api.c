@@ -109,8 +109,8 @@ tStatus tUninitialize() {
  * @param size Size of model resource data
  * @return Status code
  */
-tStatus tGetMemoryPlan(tMemory *memory_list, int32_t *num_memory,
-                       const int8_t *res, const uint64_t size) {
+tStatus tGetMemoryPlan(tMemory* memory_list, int32_t* num_memory,
+                       const int8_t* res, const uint64_t size) {
   tModelHeader *res_hdr = (tModelHeader *)res;
 
   if (res_hdr->total_size_ > size) {
@@ -256,7 +256,7 @@ tStatus tGetMemoryPlan(tMemory *memory_list, int32_t *num_memory,
 #if !(defined(WIN32) || defined(linux))
 #pragma clang optimize off
 #endif
-tStatus tModelInit(tModelHandle *hdl, const int8_t *res, const uint64_t size,
+tStatus tModelInit(tModelHandle* hdl, const int8_t* res, const uint64_t size,
                    const tMemory *memory_list, const int32_t num_memory) {
   tModelHeader *res_hdr = (tModelHeader *)res;
   int8_t *cpu_memory = NULL;
@@ -405,7 +405,7 @@ tStatus tModelInit(tModelHandle *hdl, const int8_t *res, const uint64_t size,
       inst->shape_infer->inst_memory_ = memory_list[i];
     }
   }
-  int32_t ret = tShapeInferInit((char *)res + res_hdr->shape_infer_offset_, inst->shape_infer);
+  THINKER_RET_CHECK(tShapeInferInit((char *)res + res_hdr->shape_infer_offset_, inst->shape_infer), "tShapeInferInit");
   ptr += ALIGN16(sizeof(tShapeInfer));
 
 
@@ -666,12 +666,8 @@ tStatus tCreateExecutor(const tModelHandle model_hdl, tExecHandle *hdl,
     for (j = 0; j < num_tensor; j++) {
       local_tensor[j] = inst->tensor_ + tensor_ids[j];
     }
-    tStatus ret;
     tHypeparam parm = {-1, NULL, NULL};
-    ret = op_api->init(op, local_tensor, num_tensor, &parm);
-    if (ret != T_SUCCESS) {
-      return ret;
-    }
+    THINKER_RET_CHECK(op_api->init(op, local_tensor, num_tensor, &parm), "{op_api->init}");
     p_op += op->total_size_;
   }
 
@@ -728,10 +724,7 @@ tStatus tReleaseExecutor(tExecHandle hdl) {
       local_tensor[ii] = inst->tensor_ + tensor_ids[ii];
     }
 
-    tStatus ret = op_api->fini(op, local_tensor, num_tensor);
-    if (ret != T_SUCCESS) {
-      return ret;
-    }
+    THINKER_RET_CHECK(op_api->fini(op, local_tensor, num_tensor), "{op_api->fini}");
     p_op += op->total_size_;
   }
 
@@ -904,7 +897,6 @@ tStatus tGetOutputByName(const tExecHandle hdl, const char *name,
  * @return Status code
  */
 tStatus tForward(const tExecHandle hdl) {
-  tStatus ret = T_SUCCESS;
   tExecInst *inst = (tExecInst *)~hdl;
   tModel *model = inst->model_;
   tTensor *local_tensor[512];
@@ -966,13 +958,8 @@ tStatus tForward(const tExecHandle hdl) {
       local_tensor[ii] = inst->tensor_ + tensor_ids[ii];
     }
     PROFILE_BEGIN
-    ret = op_api->forward(op, local_tensor, num_tensor, inst->dma_list_);
+    THINKER_RET_CHECK(op_api->forward(op, local_tensor, num_tensor, inst->dma_list_), "{op->api->forward}");
   //  printf("[%d]op_name:%s\n", i, op_api->name());
-    if (ret != T_SUCCESS) {
-      printf("forward error code :%d, op index :%d, op name: %s\n", ret, i,
-             op_api->name());
-      return ret;
-    }
     tTensorName *name_list =
         (tTensorName *)inst->model_->debug_info->tensor_name_list_;
 
@@ -1030,14 +1017,13 @@ tStatus tUpdateShape(tExecHandle hdl, const char **axis_names, const uint32_t *a
 {
     tExecInst *inst = (tExecInst *)~hdl;
     tModel *model   = inst->model_;
-    tStatus ret     = T_SUCCESS;
     if (num != 0)
-        ret = tSetShapeInferInputByNames(model->shape_infer, inst->shape_scalars_, axis_names, axis_sizes, num);
+        THINKER_RET_CHECK(tSetShapeInferInputByNames(model->shape_infer, inst->shape_scalars_, axis_names, axis_sizes, num), "tSetShapeInferInputByNames");
     else
-        ret = tSetShapeInferInputByTensors(model->shape_infer, inst->shape_scalars_, inst->tensor_);
-    if (ret != T_SUCCESS) return ret;
-    ret = tShapeInferForward(model->shape_infer, inst->shape_scalars_, inst->tensor_);
-    return ret;
+        THINKER_RET_CHECK(tSetShapeInferInputByTensors(model->shape_infer, inst->shape_scalars_, inst->tensor_), "tSetShapeInferInputByTensors");
+
+    THINKER_RET_CHECK(tShapeInferForward(model->shape_infer, inst->shape_scalars_, inst->tensor_), "tShapeInferForward");
+    return T_SUCCESS;
 }
 
 /**
@@ -1082,7 +1068,6 @@ tStatus tExecutorStop(tExecHandle hdl)
  * @return Status code
  */
 tStatus tGetLunaListSize(const tExecHandle hdl, uint32_t *list_size, uint32_t *list_length, uint32_t *total_param) {
-  tStatus ret = T_SUCCESS;
   tExecInst *inst = (tExecInst *)~hdl;
   tModel *model = inst->model_;
   tTensor *local_tensor[512];
@@ -1135,13 +1120,8 @@ tStatus tGetLunaListSize(const tExecHandle hdl, uint32_t *list_size, uint32_t *l
       local_tensor[ii] = inst->tensor_ + tensor_ids[ii];
     }
 
-    ret = op_api->forward(op, local_tensor, num_tensor, inst->dma_list_);
+    THINKER_RET_CHECK(op_api->forward(op, local_tensor, num_tensor, inst->dma_list_), f"{op_api->forward}";
   //  printf("[%d]op_name:%s\n", i, op_api->name());
-    if (ret != T_SUCCESS) {
-      printf("forward error code :%d, op index :%d, op name: %s\n", ret, i,
-             op_api->name());
-      return ret;
-    }
 
     p_op += op->total_size_;
   }
@@ -1153,7 +1133,7 @@ tStatus tGetLunaListSize(const tExecHandle hdl, uint32_t *list_size, uint32_t *l
 	*total_param = g_param_size;
 	g_submit_pos = 0;
 	g_param_size = 0;
-  return ret;
+  return T_SUCCESS;
 }
 
 /**
@@ -1171,7 +1151,6 @@ tStatus tBuildLunaList(const tExecHandle hdl, int8_t *base_addr, uint32_t sq_len
 	g_submit_pos = 0;
 	g_param_size = 0;
 
-  tStatus ret = T_SUCCESS;
   tExecInst *inst = (tExecInst *)~hdl;
   tModel *model = inst->model_;
   tTensor *local_tensor[512];
@@ -1222,13 +1201,8 @@ tStatus tBuildLunaList(const tExecHandle hdl, int8_t *base_addr, uint32_t sq_len
       local_tensor[ii] = inst->tensor_ + tensor_ids[ii];
     }
 
-    ret = op_api->forward(op, local_tensor, num_tensor, inst->dma_list_);
+    THINKER_RET_CHECK(op_api->forward(op, local_tensor, num_tensor, inst->dma_list_), f"{op_api->forward}");
   //  printf("[%d]op_name:%s\n", i, op_api->name());
-    if (ret != T_SUCCESS) {
-      printf("forward error code :%d, op index :%d, op name: %s\n", ret, i,
-             op_api->name());
-      return ret;
-    }
     tTensorName *name_list =
         (tTensorName *)inst->model_->debug_info->tensor_name_list_;
 

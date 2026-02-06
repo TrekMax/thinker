@@ -53,7 +53,6 @@ static luna_vec_scale_api_item luna_vec_scale_api_items[][3] = {
  * @return int32_t Operation status
  */
 static int32_t calc_vec_div_luna(tTensor *lhs, tTensor *rhs, tTensor *Y, int32_t size) {
-    int32_t ret = T_ERR_FAIL;
     int32_t x1_q = (int32_t)lhs->scale_;
     int32_t x2_q = (int32_t)rhs->scale_;
     int32_t y_q = (int32_t)Y->scale_;
@@ -61,16 +60,15 @@ static int32_t calc_vec_div_luna(tTensor *lhs, tTensor *rhs, tTensor *Y, int32_t
     void *src2 = (void *)rhs->dptr_;
     void *dst = (void *)Y->dptr_;
 
-    switch (lhs->dtype_) {
-        case Int32:
-            API_LIB(div_q31_int32)((const q31_t *)src1, x1_q, (const q31_t *)src2, x2_q, (q31_t *)dst, y_q, size);
-            break;
-        default:
-            THINKER_LOG_FATAL("data type not support!");
-            break;
+    if (lhs->dtype_ == Int32) {
+        THINKER_RET_CHECK(API_LIB(div_q31_int32)((const q31_t *)src1, x1_q, (const q31_t *)src2, x2_q, (q31_t *)dst, y_q, size), "luna_div_q31_int32");
+    }
+    else {
+        THINKER_LOG_FATAL("data type not support!");
+        return T_ERR_INVALID_DATATYPE;
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 /**
@@ -96,7 +94,6 @@ static int32_t fastlog2(int32_t x) {
  * @return int32_t Operation status
  */
 static int32_t calc_vec_rscale_luna(tTensor *lhs, int32_t scalar, tTensor *Y, int32_t size, int32_t shift) {
-    int32_t ret = T_ERR_FAIL;
     void *src = (void *)lhs->dptr_;
     void *dst = (void *)Y->dptr_;
     int32_t rshift = fastlog2(scalar);
@@ -106,12 +103,12 @@ static int32_t calc_vec_rscale_luna(tTensor *lhs, int32_t scalar, tTensor *Y, in
     luna_vec_scale_api luna_vec_api = (luna_vec_scale_api)luna_vec_scale_api_items[in_idx][ou_idx];
 
     if (lshift < 0) {
-        ret = luna_vec_api(src, 1, dst, size, -lshift);
+        THINKER_RET_CHECK(luna_vec_api(src, 1, dst, size, -lshift), "luna_vec_api");
     } else if (lshift > 0) {
-        ret = luna_vec_api(src, (1 << lshift), dst, size, 0);
+        THINKER_RET_CHECK(luna_vec_api(src, (1 << lshift), dst, size, 0), "luna_vec_api");
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 /**
@@ -122,7 +119,6 @@ static int32_t calc_vec_rscale_luna(tTensor *lhs, int32_t scalar, tTensor *Y, in
  * @return int32_t Operation status
  */
 int32_t iqdiv_luna(tTensor *lhs, tTensor *rhs, tTensor *Y) {
-    int32_t ret = T_ERR_FAIL;
     int32_t x1_q = (int32_t)lhs->scale_;
     int32_t x2_q = (int32_t)rhs->scale_;
     int32_t y_q = (int32_t)Y->scale_;
@@ -142,17 +138,14 @@ int32_t iqdiv_luna(tTensor *lhs, tTensor *rhs, tTensor *Y) {
                 scalar = (int32_t)(*(int32_t *)rhs->dptr_);
                 break;
             default:
-                ret = T_ERR_INVALID_DATATYPE;
-                break;
+                return T_ERR_INVALID_DATATYPE;
         }
-        if (ret == T_ERR_FAIL) {
-            ret = calc_vec_rscale_luna(lhs, scalar, Y, size, shift);
-        }
+        THINKER_RET_CHECK(calc_vec_rscale_luna(lhs, scalar, Y, size, shift), "calc_vec_rscale_luna");
     } else {  // Vector case
-        ret = calc_vec_div_luna(lhs, rhs, Y, size);
+        THINKER_RET_CHECK(calc_vec_div_luna(lhs, rhs, Y, size), "calc_vec_div_luna");
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif

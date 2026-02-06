@@ -81,16 +81,11 @@ static void luna_maxpool_para_init(PoolAttrs* attrs, conv_struct_t *conv_attrs, 
  * @param attrs Pooling attributes
  * @return Operation result status
  */
-int32_t maxpool_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs *attrs)
-{
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
-
+int32_t maxpool_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs *attrs) {
     conv_struct_t pool_struct_;
     luna_cnn_static_para_t conv_static_para;
     luna_maxpool_para_init(attrs, &pool_struct_, (tTensor *)X, Y);
-    ret = luna_split_conv_para_pack(&pool_struct_, &conv_static_para, LUNA_MAX_POOLING);
-    if (ret != T_SUCCESS)
-        return ret;
+    THINKER_RET_CHECK(luna_split_conv_para_pack(&pool_struct_, &conv_static_para, LUNA_MAX_POOLING), "luna_split_conv_para_pack");
 
     int32_t batch = X->shape_.dims_[0];
     int32_t in_c = pool_struct_.input_c;
@@ -118,15 +113,15 @@ int32_t maxpool_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs *att
             {
                 int8_t *p_in = (int8_t *)X->dptr_ + n * in_batch_size;
                 int8_t *p_out = (int8_t *)Y->dptr_ + n * ou_batch_size;
-                ret = API_LIB(max_pooling2d_i8o8)(p_in, p_out, &conv_static_para);
+                THINKER_RET_CHECK(API_LIB(max_pooling2d_i8o8)(p_in, p_out, &conv_static_para), "luna_max_pooling2d_i8o8");
             }
         }
         // Case 2: Output in fast memory, workspace available for input copy
         else if ((2 == Y->mem_.type_) & (workspace_size >= in_c * in_h * in_w)) {
             int8_t *p_in = (int8_t *)Temp->dptr_;
             int8_t *p_out = (int8_t *)Y->dptr_;
-            ret = API_LIB(memcpy_i8o8)(p_in, (int8_t *)X->dptr_, in_c * in_h * in_w);
-            ret = API_LIB(max_pooling2d_i8o8)(p_in, p_out, &conv_static_para);
+            THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(p_in, (int8_t *)X->dptr_, in_c * in_h * in_w), "luna_memcpy_i8o8");
+            THINKER_RET_CHECK(API_LIB(max_pooling2d_i8o8)(p_in, p_out, &conv_static_para), "luna_max_pooling2d_i8o8");
         }
         // Case 3: Split input height processing
         else if (2 == Y->mem_.type_) { //split input H
@@ -219,10 +214,10 @@ int32_t maxpool_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs *att
                     int32_t i_offset = in_w * in_h;
                     for (c = 0; c < in_c; c++)
                     {
-                        ret = API_LIB(memcpy_i8o8)(p_tmp + c * o_offset, p_in_tmp + c * i_offset, o_offset);
+                        THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(p_tmp + c * o_offset, p_in_tmp + c * i_offset, o_offset), "luna_memcpy_i8o8");
                     }
-                    ret = luna_split_conv_para_pack(&pool_struct_, &conv_static_para, LUNA_MAX_POOLING);
-                    ret = API_LIB(max_pooling2d_i8o8)(p_tmp, p_out_tmp, &conv_static_para);
+                    THINKER_RET_CHECK(luna_split_conv_para_pack(&pool_struct_, &conv_static_para, LUNA_MAX_POOLING), "luna_split_conv_para_pack");
+                    THINKER_RET_CHECK(API_LIB(max_pooling2d_i8o8)(p_tmp, p_out_tmp, &conv_static_para), "luna_max_pooling2d_i8o8");
                 }
 
                 // Finalize results
@@ -233,10 +228,10 @@ int32_t maxpool_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs *att
                     {
                         int32_t i_offset = i * ou_addr_offset + j * one_channel_ou_offset;
                         int32_t o_offset = i * one_channel_ou_offset + j * ou_w * ou_h;
-                        ret = API_LIB(memcpy_i8o8)(p_tmp + o_offset, p_out + i_offset, one_channel_ou_offset);
+                        THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(p_tmp + o_offset, p_out + i_offset, one_channel_ou_offset), "luna_memcpy_i8o8");
                     }
                 }
-                ret = API_LIB(memcpy_i8o8)(p_out, p_tmp, ou_c * ou_h * ou_w);
+                THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(p_out, p_tmp, ou_c * ou_h * ou_w), "luna_memcpy_i8o8");
             }
         }
         else {
@@ -244,7 +239,7 @@ int32_t maxpool_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs *att
         }    
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif

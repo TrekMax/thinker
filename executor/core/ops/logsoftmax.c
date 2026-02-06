@@ -23,7 +23,6 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     
     // Get log-softmax attributes
     LogSoftmaxAttrs *attrs = (LogSoftmaxAttrs *)((int8_t *)op + op->attr_offset_);
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
     
 #if THINKER_USE_VENUS
 #if THINKER_PROFILE
@@ -31,7 +30,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
 #endif
 
     // Call hardware-specific log-softmax implementation
-    ret = logsoftmax_luna(tensors[0], tensors[op->num_input_], attrs);
+    THINKER_RET_CHECK(logsoftmax_luna(tensors[0], tensors[op->num_input_], attrs), "logsoftmax_luna");
 
 #if THINKER_PROFILE
     uint64_t finish_t = tick_count();
@@ -40,7 +39,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
 #endif
 #endif
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #include "core/operator_template.h"

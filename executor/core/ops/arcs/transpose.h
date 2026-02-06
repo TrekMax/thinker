@@ -44,7 +44,6 @@ static tStatus luna_trans_axis_all(void *src, void*dst, uint32_t *shape, uint32_
  * @return Execution status
  */
 tStatus transpose_luna(tTensor *X, tTensor *Y, tTensor * workspace, uint32_t dims, uint32_t *axes, uint32_t *shape) {
-    tStatus ret = T_ERR_NO_IMPLEMENTED;
     void *src = (void *)X->dptr_;
     void *dst = (void *)Y->dptr_;
     int32_t workspace_size = workspace ? workspace->shape_.dims_[0] : 0;
@@ -59,13 +58,13 @@ tStatus transpose_luna(tTensor *X, tTensor *Y, tTensor * workspace, uint32_t dim
                 uint32_t row = shape[0];
                 uint32_t col = shape[1];
                 if (total_size <= 16384)
-                    ret = mat_transpose_all(src, dst, row, col, X->dtype_);
+                    THINKER_RET_CHECK(mat_transpose_all(src, dst, row, col, X->dtype_), "mat_transpose_all");
                 else
-                    ret = split_mat_transpose_all(src, dst, row, col, X->dtype_);
+                    THINKER_RET_CHECK(split_mat_transpose_all(src, dst, row, col, X->dtype_), "mat_split_mat_transpose_all");
                 break;
             }
             case 3: {
-                ret = luna_trans_axis_all(src, dst, shape, axes, dims, X->dtype_);
+                THINKER_RET_CHECK(luna_trans_axis_all(src, dst, shape, axes, dims, X->dtype_), "luna_trans_axis_all");
                 break;
             }
             case 4:  // only support (0 == new_perm[0]), convert to 3D transpose
@@ -84,7 +83,7 @@ tStatus transpose_luna(tTensor *X, tTensor *Y, tTensor * workspace, uint32_t dim
                     for (int32_t i = 0; i < batch; i++) {
                         void *src_temp = (void *)((int8_t *)src + i * one_batch_size);
                         void *dst_temp = (void *)((int8_t *)dst + i * one_batch_size);
-                        ret = luna_trans_axis_all(src_temp, dst_temp, new_shape, new_axis, 3, X->dtype_);
+                        THINKER_RET_CHECK(luna_trans_axis_all(src_temp, dst_temp, new_shape, new_axis, 3, X->dtype_), "luna_trans_axis_all");
                     }
                 }
                 else {
@@ -101,26 +100,26 @@ tStatus transpose_luna(tTensor *X, tTensor *Y, tTensor * workspace, uint32_t dim
                 int32_t col = shape[1];
                 if (total_size <= 16384) {
                     int8_t *src_temp = (int8_t *)dst;
-                    ret = luna_memcpy_i8o8(src_temp, src, total_size);
-                    ret = mat_transpose_all(src_temp, dst, row, col, X->dtype_);
+                    THINKER_RET_CHECK(luna_memcpy_i8o8(src_temp, src, total_size), "luna_memcpy_i8o8");
+                    THINKER_RET_CHECK(mat_transpose_all(src_temp, dst, row, col, X->dtype_), "mat_transpose_all");
                 }
                 else if (total_size <= workspace_size) {
                     int8_t *src_temp = (int8_t *)workspace->dptr_;
-                    ret = luna_memcpy_i8o8(src_temp, src, total_size);
-                    ret = split_mat_transpose_all(src_temp, dst, row, col, X->dtype_);
+                    THINKER_RET_CHECK(luna_memcpy_i8o8(src_temp, src, total_size), "luna_memcpy_i8o8");
+                    THINKER_RET_CHECK(split_mat_transpose_all(src_temp, dst, row, col, X->dtype_), "split_mat_transpose_all");
                 }
                 else
-                    ret = T_ERR_NO_WORKSPACE;
+                    return T_ERR_NO_WORKSPACE;
                 break;
             }
             case 3: {
                 if (total_size <= workspace_size) {
                     int8_t *src_temp = (int8_t *)workspace->dptr_;
-                    ret = luna_memcpy_i8o8(src_temp, src, total_size);
-                    ret = luna_trans_axis_all(src, dst, shape, axes, dims, X->dtype_);
+                    THINKER_RET_CHECK(luna_memcpy_i8o8(src_temp, src, total_size), "luna_memcpy_i8o8");
+                    THINKER_RET_CHECK(luna_trans_axis_all(src, dst, shape, axes, dims, X->dtype_), "luna_trans_axis_all");
                 }
                 else
-                    ret = T_ERR_NO_WORKSPACE;
+                    return T_ERR_NO_WORKSPACE;
                 break;
             }
             case 4: {
@@ -136,11 +135,11 @@ tStatus transpose_luna(tTensor *X, tTensor *Y, tTensor * workspace, uint32_t dim
                     }
                     if (one_batch_size <= workspace_size) {
                         for (int32_t i = 0; i < batch; i++) {
-                            void *src = (void *)((int8_t *)src + i * one_batch_size);
-                            void *dst = (void *)((int8_t *)dst + i * one_batch_size);
-                            int8_t *src_temp = (int8_t *)workspace->dptr_;
-                            ret = luna_memcpy_i8o8(src_temp, src, one_batch_size);
-                            ret = luna_trans_axis_all(src_temp, dst, new_shape, new_axis, 3, X->dtype_);
+                            void *src_temp = (void *)((int8_t *)src + i * one_batch_size);
+                            void *dst_temp = (void *)((int8_t *)dst + i * one_batch_size);
+                            int8_t *src_temp1 = (int8_t *)workspace->dptr_;
+                            THINKER_RET_CHECK(luna_memcpy_i8o8(src_temp1, src_temp, one_batch_size), "luna_memcpy_i8o8");
+                            THINKER_RET_CHECK(luna_trans_axis_all(src_temp1, dst, new_shape, new_axis, 3, X->dtype_), "luna_trans_axis_all");
                         }
                     }
                     else {
@@ -164,9 +163,9 @@ tStatus transpose_luna(tTensor *X, tTensor *Y, tTensor * workspace, uint32_t dim
                     int8_t *src_temp = (int8_t *)src;
                     if (srcInPSRAM) {
                         src_temp = (int8_t *)workspace->dptr_;
-                        ret = luna_memcpy_i8o8(src_temp, src, total_size);
+                        THINKER_RET_CHECK(luna_memcpy_i8o8(src_temp, src, total_size), "luna_memcpy_i8o8");
                     }
-                    ret = mat_transpose_all(src_temp, dst_temp, row, col, X->dtype_);
+                    THINKER_RET_CHECK(mat_transpose_all(src_temp, dst_temp, row, col, X->dtype_), "luna_mat_transpose_all");
                     opi_psram_cpy_out(dst, dst_temp, total_size);
                 }
                 else if (total_size > 16384) {
@@ -176,26 +175,26 @@ tStatus transpose_luna(tTensor *X, tTensor *Y, tTensor * workspace, uint32_t dim
                             return T_ERR_NO_WORKSPACE;
                         else {
                             src_temp = (int8_t *)workspace->dptr_ + total_size;
-                            ret = luna_memcpy_i8o8(src_temp, src, total_size);
+                            THINKER_RET_CHECK(luna_memcpy_i8o8(src_temp, src, total_size), "luna_memcpy_i8o8");
                         }
                     }
-                    ret = split_mat_transpose_all(src_temp, dst_temp, row, col, X->dtype_);
+                    THINKER_RET_CHECK(split_mat_transpose_all(src_temp, dst_temp, row, col, X->dtype_), "luna_split_mat_transpose_all");
                     opi_psram_cpy_out(dst, dst_temp, total_size);
                 }
                 else
-                    ret = T_ERR_NO_WORKSPACE;
+                    return T_ERR_NO_WORKSPACE;
                 break;
             }
             case 3: {
                 int8_t *dst_temp = (int8_t *)workspace->dptr_;
                 if ((!srcInPSRAM) && (total_size <= workspace_size)) {
-                    ret = luna_trans_axis_all(src, dst_temp, shape, axes, dims, X->dtype_);
+                    THINKER_RET_CHECK(luna_trans_axis_all(src, dst_temp, shape, axes, dims, X->dtype_), "luna_trans_axis_all");
                     opi_psram_cpy_out(dst, dst_temp, total_size);
                 }
                 else if (srcInPSRAM && (total_size * 2 <= workspace_size)) {
                     int8_t *src_temp = (int8_t *)workspace->dptr_ + total_size;
-                    ret = luna_memcpy_i8o8(src_temp, src, total_size);
-                    ret = luna_trans_axis_all(src_temp, dst_temp, shape, axes, dims, X->dtype_);
+                    THINKER_RET_CHECK(luna_memcpy_i8o8(src_temp, src, total_size), "luna_memcpy_i8o8");
+                    THINKER_RET_CHECK(luna_trans_axis_all(src_temp, dst_temp, shape, axes, dims, X->dtype_), "luna_trans_axis_all");
                     opi_psram_cpy_out(dst, dst_temp, total_size);
                 }
                 else if (0 == axes[0]) {// convert to 2D
@@ -214,9 +213,9 @@ tStatus transpose_luna(tTensor *X, tTensor *Y, tTensor * workspace, uint32_t dim
                             int8_t *src_temp = (int8_t *)(src + i * one_batch_size);
                             if (srcInPSRAM) {
                                 src_temp = (int8_t *)workspace->dptr_;
-                                ret = luna_memcpy_i8o8(src_temp, src + i * one_batch_size, one_batch_size);
+                                THINKER_RET_CHECK(luna_memcpy_i8o8(src_temp, src + i * one_batch_size, one_batch_size), "luna_memcpy_i8o8");
                             }
-                            ret = mat_transpose_all(src_temp, dst_temp, shape[1], shape[2], X->dtype_);
+                            THINKER_RET_CHECK(mat_transpose_all(src_temp, dst_temp, shape[1], shape[2], X->dtype_), "mat_transpose_all");
                             opi_psram_cpy_out(dst + i * one_batch_size, dst_temp, one_batch_size);
                         }
                     }
@@ -228,18 +227,18 @@ tStatus transpose_luna(tTensor *X, tTensor *Y, tTensor * workspace, uint32_t dim
                                     return T_ERR_NO_WORKSPACE;
                                 else {
                                     src_temp = (int8_t *)workspace->dptr_ + one_batch_size;
-                                    ret = luna_memcpy_i8o8(src_temp, src, one_batch_size);
+                                    THINKER_RET_CHECK(luna_memcpy_i8o8(src_temp, src, one_batch_size), "luna_memcpy_i8o8");
                                 }
                             }
-                            ret = split_mat_transpose_all(src_temp, dst_temp, shape[1], shape[2], X->dtype_);
+                            THINKER_RET_CHECK(split_mat_transpose_all(src_temp, dst_temp, shape[1], shape[2], X->dtype_), "split_mat_transpose_all");
                             opi_psram_cpy_out(dst + i * one_batch_size, dst_temp, one_batch_size);
                         }
                     }
                     else
-                        ret = T_ERR_NO_WORKSPACE;
+                        return T_ERR_NO_WORKSPACE;
                 }
                 else
-                    ret = T_ERR_NO_WORKSPACE;
+                    return T_ERR_NO_WORKSPACE;
                 break;
             }
             case 4: {
@@ -258,25 +257,25 @@ tStatus transpose_luna(tTensor *X, tTensor *Y, tTensor * workspace, uint32_t dim
                             for (int32_t i = 0; i < batch; i++) {
                                 int8_t *src_temp = (int8_t *)workspace->dptr_ + one_batch_size;
                                 int8_t *dst_temp = (int8_t *)workspace->dptr_;
-                                ret = luna_memcpy_i8o8(src_temp, src + i * one_batch_size, one_batch_size);
-                                ret = luna_trans_axis_all(src_temp, dst_temp, new_shape, new_axis, 3, X->dtype_);
+                                THINKER_RET_CHECK(luna_memcpy_i8o8(src_temp, src + i * one_batch_size, one_batch_size), "luna_memcpy_i8o8");
+                                THINKER_RET_CHECK(luna_trans_axis_all(src_temp, dst_temp, new_shape, new_axis, 3, X->dtype_), "luna_trans_axis_all");
                                 opi_psram_cpy_out(dst + i * one_batch_size, dst_temp, total_size);
                             }
                         }
                         else
-                            ret = T_ERR_NO_WORKSPACE;
+                            return T_ERR_NO_WORKSPACE;
                     }
                     else {
                         if (one_batch_size <= workspace_size) {
                             for (int32_t i = 0; i < batch; i++) {
                                 int8_t *src_temp = (int8_t *)src + one_batch_size;
                                 int8_t *dst_temp = (int8_t *)workspace->dptr_;
-                                ret = luna_trans_axis_all(src_temp, dst_temp, new_shape, new_axis, 3, X->dtype_);
+                                THINKER_RET_CHECK(luna_trans_axis_all(src_temp, dst_temp, new_shape, new_axis, 3, X->dtype_), "luna_trans_axis_all");
                                 opi_psram_cpy_out(dst + i * one_batch_size, dst_temp, total_size);
                             }
                         }
                         else 
-                            ret = T_ERR_NO_WORKSPACE;
+                            return T_ERR_NO_WORKSPACE;
                     }
                 }
                 else {
@@ -286,7 +285,7 @@ tStatus transpose_luna(tTensor *X, tTensor *Y, tTensor * workspace, uint32_t dim
             }
         }
     }
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif

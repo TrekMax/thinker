@@ -32,7 +32,6 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     
     // Get LSTM attributes
     LstmIntAttrs *attr = (LstmIntAttrs *)((int8_t *)op + op->attr_offset_);
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
     
     // Get input, weights, biases, and output tensors
     int32_t w_idx = 1;
@@ -92,16 +91,16 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
         tTensor h2h_bias_temp = h2h_bias[0];
         h2h_bias_temp.dptr_ = (addr_type)((int8_t *)i2h_bias_temp.dptr_ + getShapeSize(&(i2h_bias_temp.shape_)) * i2h_bias_temp.byte_);
         
-        ret = lstmint_luna(input, t_hidden_in, t_cell_in, &i2h_w_temp, &h2h_w_temp,
-                        &i2h_bias_temp, &h2h_bias_temp, t_seq, output, hidden_o, hidden_c, attr, workspace);
+        THINKER_RET_CHECK(lstmint_luna(input, t_hidden_in, t_cell_in, &i2h_w_temp, &h2h_w_temp,
+                        &i2h_bias_temp, &h2h_bias_temp, t_seq, output, hidden_o, hidden_c, attr, workspace), "lstmint_luna");
     }
     else {
         if (num_tensor > op->num_input_ + op->num_output_) {
             workspace = tensors[op->num_input_ + op->num_output_];
         }
 
-        ret = lstmint_luna(input, t_hidden_in, t_cell_in, i2h_w, h2h_w, i2h_bias, h2h_bias, 
-                            t_seq, output, hidden_o, hidden_c, attr, workspace);
+        THINKER_RET_CHECK(lstmint_luna(input, t_hidden_in, t_cell_in, i2h_w, h2h_w, i2h_bias, h2h_bias, 
+                            t_seq, output, hidden_o, hidden_c, attr, workspace), "lstmint_luna");
     }
 #elif THINKER_USE_ARCS
     if (list->total_ > 0) {
@@ -123,15 +122,15 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
             tTensor h2h_bias_temp = h2h_bias[0];
             h2h_bias_temp.dptr_ = dma_temp->dptr_;
             
-            ret = lstmint_luna2(input, t_hidden_in, t_cell_in, &i2h_w_temp, &h2h_w_temp, &i2h_bias_temp, &h2h_bias_temp,
-                               t_seq, output, hidden_o, hidden_c, attr, workspace, list);
+            THINKER_RET_CHECK(lstmint_luna2(input, t_hidden_in, t_cell_in, &i2h_w_temp, &h2h_w_temp, &i2h_bias_temp, &h2h_bias_temp,
+                               t_seq, output, hidden_o, hidden_c, attr, workspace, list), "lstmint_luna");
         }
     } else {
         if (num_tensor > op->num_input_ + op->num_output_) {
             workspace = tensors[op->num_input_ + op->num_output_];
         }
-        ret = lstmint_luna(input, t_hidden_in, t_cell_in, i2h_w, h2h_w, i2h_bias, h2h_bias,
-                          t_seq, output, hidden_o, hidden_c, attr, workspace);
+        THINKER_RET_CHECK(lstmint_luna(input, t_hidden_in, t_cell_in, i2h_w, h2h_w, i2h_bias, h2h_bias,
+                          t_seq, output, hidden_o, hidden_c, attr, workspace), "lstmint_luna");
     }
 #elif THINKER_USE_VENUSA
     if (list->total_ > 0) {
@@ -153,15 +152,15 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
             tTensor h2h_bias_temp = h2h_bias[0];
             h2h_bias_temp.dptr_ = dma_temp->dptr_;
             
-            ret = lstmint_luna(input, t_hidden_in, t_cell_in, &i2h_w_temp, &h2h_w_temp, &i2h_bias_temp, &h2h_bias_temp,
-                               t_seq, output, hidden_o, hidden_c, attr, workspace);
+            THINKER_RET_CHECK(lstmint_luna(input, t_hidden_in, t_cell_in, &i2h_w_temp, &h2h_w_temp, &i2h_bias_temp, &h2h_bias_temp,
+                               t_seq, output, hidden_o, hidden_c, attr, workspace), "lstmint_luna");
         }
     } else {
         if (num_tensor > op->num_input_ + op->num_output_) {
             workspace = tensors[op->num_input_ + op->num_output_];
         }
-        ret = lstmint_luna(input, t_hidden_in, t_cell_in, i2h_w, h2h_w, i2h_bias, h2h_bias,
-                          t_seq, output, hidden_o, hidden_c, attr, workspace);
+        THINKER_RET_CHECK(lstmint_luna(input, t_hidden_in, t_cell_in, i2h_w, h2h_w, i2h_bias, h2h_bias,
+                          t_seq, output, hidden_o, hidden_c, attr, workspace), "lstmint_luna");
     }
 #endif
 
@@ -171,7 +170,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     printf("%8s | %u | (","LSTMInt", total_t);
 #endif
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #include "core/operator_template.h"

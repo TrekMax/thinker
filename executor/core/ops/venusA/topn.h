@@ -25,10 +25,7 @@
  * @param attrs TopN attributes including dimension and max number
  * @return Operation status
  */
-int32_t topn_luna(tTensor *X, tTensor *Index, tTensor *Y, tTensor *work_space, topNAttrs *attrs) 
-{
-  int32_t ret = T_ERR_NO_IMPLEMENTED;
-  
+int32_t topn_luna(tTensor *X, tTensor *Index, tTensor *Y, tTensor *work_space, topNAttrs *attrs) {
   int32_t axis = attrs->dim;
   int32_t n = attrs->max_num;
   int32_t n_dims = X->shape_.ndim_;
@@ -56,7 +53,7 @@ int32_t topn_luna(tTensor *X, tTensor *Index, tTensor *Y, tTensor *work_space, t
       for (int i = 0; i < leading; i++)
       {
         int8_t *p_src = (int8_t *)X->dptr_ + i * once_size;     
-        ret = API_LIB(max_i8o32)(p_src, p_tmp, once_size);
+        THINKER_RET_CHECK(API_LIB(max_i8o32)(p_src, p_tmp, once_size), "luna_max_i8o32");
         p_dst_val[i] = (int32_t)p_tmp[0];
         p_dst_idx[i] = (int32_t)(p_tmp[1] + idx_offset);
       }
@@ -66,7 +63,7 @@ int32_t topn_luna(tTensor *X, tTensor *Index, tTensor *Y, tTensor *work_space, t
       break;
   }
 
-  return ret;
+  return T_SUCCESS;
 }
 
 #endif

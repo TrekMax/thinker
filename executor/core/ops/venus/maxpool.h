@@ -78,8 +78,6 @@ static void luna_maxpool_para_init(PoolAttrs* attrs, s_conv_struct *conv_attrs, 
  * @return int32_t Operation status
  */
 int32_t maxpool_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs *attrs) {
-    int32_t ret = -1;
-
     s_conv_struct pool_struct_;
     luna_maxpool_para_init(attrs, &pool_struct_, (tTensor *)X, Y);
 
@@ -108,7 +106,7 @@ int32_t maxpool_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs *att
             for (int32_t n = 0; n < batch; n++) {
                 int8_t *p_in = (int8_t *)X->dptr_ + n * in_batch_size;
                 int8_t *p_out = (int8_t *)Y->dptr_ + n * ou_batch_size;
-                ret = API_LIB(max_pooling)(p_in, p_out, &pool_struct_);
+                THINKER_RET_CHECK(API_LIB(max_pooling)(p_in, p_out, &pool_struct_), "luna_max_pooling");
             }
         } else {  // Split input along height dimension
             int32_t input_limit_without_h = (luna_quant_ceil(in_c, 3) << 3) * (luna_quant_ceil(in_w, (3 + log2n_stride_w)) << (3 + log2n_stride_w));
@@ -198,7 +196,7 @@ int32_t maxpool_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs *att
                     }
 
                     // Perform max pooling on temporary buffer
-                    ret = API_LIB(max_pooling)(p_tmp, p_out_tmp, &pool_struct_);
+                    THINKER_RET_CHECK(API_LIB(max_pooling)(p_tmp, p_out_tmp, &pool_struct_), "luna_max_pooling");
                 }
 
                 int32_t one_channel_ou_offset = ou_w * tmp_ou_h * (0xF & Y->dtype_);
@@ -214,7 +212,7 @@ int32_t maxpool_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs *att
         }
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif

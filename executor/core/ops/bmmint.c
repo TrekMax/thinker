@@ -22,8 +22,6 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     // Validate input tensor count
     CHECK_GE(num_tensor, (op->num_input_ + op->num_output_));
     
-    int32_t ret = T_ERR_NO_IMPLEMENTED;  // Default error return
-    
     // Get operator attributes
     iqBinaryAttrs *attrs = (iqBinaryAttrs *)((int8_t *)op + op->attr_offset_);
     
@@ -44,7 +42,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
         #endif
         
         // Call platform-specific BMM integer implementation
-        ret = bmmint_luna(X, Y, O, Workspace);
+        THINKER_RET_CHECK(bmmint_luna(X, Y, O, Workspace), "bmmint_luna");
         
         #if THINKER_PROFILE
         uint64_t finish_t = tick_count();  // Record end time for profiling
@@ -53,7 +51,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
         #endif
     #endif
 
-    return ret;  // Return result code
+    return T_SUCCESS;  // Return result code
 }
 
 #include "core/operator_template.h"

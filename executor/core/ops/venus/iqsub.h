@@ -22,8 +22,6 @@
  * @return int32_t Operation status
  */
 int32_t iqsub_luna(tTensor *X1, tTensor *X2, tTensor *Temp, tTensor *Y) {
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
-
     int32_t x1_q = (int32_t)X1->scale_;
     int32_t x2_q = (int32_t)X2->scale_;
     int32_t y_q = (int32_t)Y->scale_;
@@ -34,7 +32,7 @@ int32_t iqsub_luna(tTensor *X1, tTensor *X2, tTensor *Temp, tTensor *Y) {
 
     // Check if input scales are valid relative to output scale
     if ((x1_q < y_q) || x2_q < y_q) {
-        return ret;
+        return T_ERR_INVALID_PARA;
     }
 
     // Check if tensors are in PSRAM
@@ -57,7 +55,7 @@ int32_t iqsub_luna(tTensor *X1, tTensor *X2, tTensor *Temp, tTensor *Y) {
 
                 // Scale X1 if needed
                 if (x1_q != y_q) {
-                    ret = API_LIB(scale_q7_int8)((const q7_t *)src1, 1, (int8_t *)Temp->dptr_, size, shift1);
+                    THINKER_RET_CHECK(API_LIB(scale_q7_int8)((const q7_t *)src1, 1, (int8_t *)Temp->dptr_, size, shift1), "luna_scale_q7_int8");
                     src1 = (int8_t *)Temp->dptr_;
                 }
 
@@ -69,9 +67,9 @@ int32_t iqsub_luna(tTensor *X1, tTensor *X2, tTensor *Temp, tTensor *Y) {
 
                 // Scale X2 if needed
                 if (x2_q != y_q) {
-                    ret = API_LIB(scale_q7_int8)((const q7_t *)src2, 1, 
+                    THINKER_RET_CHECK(API_LIB(scale_q7_int8)((const q7_t *)src2, 1, 
                                                 (int8_t *)(Temp->dptr_ + ((x1_is_psram || x1_q != y_q) * size)), 
-                                                size, shift2);
+                                                size, shift2), "luna_scale_q7_int8");
                     src2 = (int8_t *)Temp->dptr_ + ((x1_is_psram || x1_q != y_q) * size);
                 }
 
@@ -81,7 +79,7 @@ int32_t iqsub_luna(tTensor *X1, tTensor *X2, tTensor *Temp, tTensor *Y) {
                 }
 
                 // Perform subtraction
-                ret = API_LIB(sub_q7_int8)((const q7_t *)dst, (q7_t *)src2, (int8_t *)dst, size, 0);
+                THINKER_RET_CHECK(API_LIB(sub_q7_int8)((const q7_t *)dst, (q7_t *)src2, (int8_t *)dst, size, 0), "luna_sub_q7_int8");
 
                 // Copy result to output if needed
                 if (y_is_psram) {
@@ -89,12 +87,11 @@ int32_t iqsub_luna(tTensor *X1, tTensor *X2, tTensor *Temp, tTensor *Y) {
                 }
                 break;
             default:
-                ret = T_ERR_INVALID_DATATYPE;
-                break;
+                return T_ERR_INVALID_DATATYPE;
         }
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif

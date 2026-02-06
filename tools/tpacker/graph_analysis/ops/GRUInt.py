@@ -92,10 +92,12 @@ class GRUInt(Operator):
         """Calculate the required workspace for the GRUInt operation."""
         h2h_weight = self.inputs[self.weight_index + 1]
         hidden_size = h2h_weight.shape[1]
-        workspace_size = hidden_size * 4 * 3
-        if workspace_size != 0:
-            return [Tensor.from_shape([workspace_size], np.int8, MemType.SHARE_MEM)]
-        return []
+        platform = self.attrs.get("platform", "venus")
+        if platform == "venus":
+            workspace_size = hidden_size * 4 * 3
+        else:
+            workspace_size = hidden_size * 4 * 5
+        return [Tensor.from_shape([workspace_size], np.int8, MemType.SHARE_MEM)]
 
     def pack_params(self):
         """Pack the parameters for the GRUInt operation, handling weight transposition."""

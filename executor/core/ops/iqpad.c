@@ -31,7 +31,6 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     
     // Get padding attributes
     iqPadAttrs *attr = (iqPadAttrs *)((int8_t *)op + op->attr_offset_);
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
     
 #if THINKER_USE_VENUS || THINKER_USE_ARCS || THINKER_USE_VENUSA
 #if THINKER_PROFILE
@@ -46,7 +45,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     tTensor *Y = tensors[op->num_input_];
     
     // Call hardware-specific padding implementation
-    ret = iqpad_luna(X, pads, constants, workspace, Y, attr);
+    THINKER_RET_CHECK(iqpad_luna(X, pads, constants, workspace, Y, attr), "iqpad_luna");
 
 #if THINKER_PROFILE
     uint64_t finish_t = tick_count();
@@ -55,7 +54,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
 #endif
 #endif
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #include "core/operator_template.h"

@@ -85,7 +85,7 @@ class ThinkerRunner:
                 print(f"Error: Failed to allocate {self.psram_size} bytes for PSRAM.")
             
             try:
-                self.share_size = 384*1024
+                self.share_size = 640*1024
                 self.share_buffer = ct.create_string_buffer(self.share_size)
             except MemoryError:
                 print(f"Error: Failed to allocate {self.share_size} bytes for PSRAM.")
@@ -95,13 +95,20 @@ class ThinkerRunner:
         model_file_to_load = None
         
         if thinker_res_path is None:
+            sram_size = {
+                'venus': 655360,
+                'arcs': 393216,
+                'venusa': 393216
+            }
+            platform = self.platform.lower()
+
             thinker_res_dir = "data.ignore"
             if os.path.exists(thinker_res_dir):
                 subprocess.run(f"rm -rf {thinker_res_dir}", shell=True)
             Path(thinker_res_dir).mkdir(parents=True, exist_ok=True)
             
             thinker_res_path = f"{thinker_res_dir}/test.bin"
-            cmd = f"tpacker -g {onnx_path} -d True -r 393216 --dma_prefetch=True -o {thinker_res_path}"
+            cmd = f"tpacker -g {onnx_path} -d True -p {platform} -r {sram_size[platform]} --dma_prefetch=True -o {thinker_res_path}"
             
             print(f"  ->-> Running tpacker: {cmd}")
             exit_code = os.system(cmd)

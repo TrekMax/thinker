@@ -24,10 +24,7 @@
  * @param attr Operation attributes
  * @return int32_t Operation status
  */
-int32_t gather_luna(tTensor *X, tTensor *indices, tTensor *Y, GatherAttrs *attr) 
-{
-  int32_t ret = T_SUCCESS;
-
+int32_t gather_luna(tTensor *X, tTensor *indices, tTensor *Y, GatherAttrs *attr) {
   int32_t axis = attr->axis < 0 ? X->shape_.ndim_ + attr->axis : attr->axis;
 
   // Calculate number of elements in indices
@@ -58,7 +55,6 @@ int32_t gather_luna(tTensor *X, tTensor *indices, tTensor *Y, GatherAttrs *attr)
           convert_4bitto8bit(output + l * ndim * tail + j * tail, input + l * middle * (tail/2) + idx * (tail/2), tail);
         }
       }
-      ret = T_SUCCESS;
 #if !(defined(WIN32) || defined(linux))
       if (2 != Y->mem_.type_) {
 		    HAL_FlushDCache_by_Addr((uint32_t *)output, leading * ndim * tail);
@@ -71,14 +67,13 @@ int32_t gather_luna(tTensor *X, tTensor *indices, tTensor *Y, GatherAttrs *attr)
         {
           int64_t idx = index[j] == -1 ? X->shape_.dims_[axis] - 1 : index[j];
           if (Y->mem_.type_ == 2)
-            ret = API_LIB(memcpy_i8o8)(output + (l * ndim * tail + j * tail) * X->byte_,
+            THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(output + (l * ndim * tail + j * tail) * X->byte_,
                   input + (l * middle * tail + idx * tail) * X->byte_,
-                  X->byte_ * tail);
+                  X->byte_ * tail), "luna_memcpy_i8o8");
           else {
             opi_psram_cpy_out(output + (l * ndim * tail + j * tail) * X->byte_,
                     input + (l * middle * tail + idx * tail) * X->byte_,
                     X->byte_ * tail);
-            ret = T_SUCCESS;
           }
         }
     }
@@ -91,21 +86,20 @@ int32_t gather_luna(tTensor *X, tTensor *indices, tTensor *Y, GatherAttrs *attr)
       {
         int32_t idx = index[j] == -1 ? X->shape_.dims_[axis] - 1 : index[j];
         if (Y->mem_.type_ == 2) {
-          ret = API_LIB(memcpy_i8o8)(output + (l * ndim * tail + j * tail) * X->byte_,
+          THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(output + (l * ndim * tail + j * tail) * X->byte_,
                             input + (l * middle * tail + idx * tail) * X->byte_,
-                            X->byte_ * tail);
+                            X->byte_ * tail), "luna_memcpy_i8o8");
         }
         else {
           opi_psram_cpy_out(output + (l * ndim * tail + j * tail) * X->byte_,
                   input + (l * middle * tail + idx * tail) * X->byte_,
                   X->byte_ * tail);
-          ret = T_SUCCESS;
         }
       }
   }
   else
-    ret = T_ERR_INVALID_DATATYPE;
+    return T_ERR_INVALID_DATATYPE;
 
-  return ret;
+  return T_SUCCESS;
 }
 #endif  //_GATHER_VENUS_H_

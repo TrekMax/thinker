@@ -43,28 +43,27 @@ int32_t luna_ffn_int_trans(int8_t *p_input,
                           uint32_t dim_in, uint32_t dim_hidden, uint32_t dim_out, uint32_t seq_len,
                           int32_t q_input_m0, int32_t q_weight_m0, int32_t q_output_m0, 
                           int32_t q_input_m1, int32_t q_weight_m1, int32_t q_output_m1) {
-    int32_t ret = T_SUCCESS;
     int8_t *p_output1 = p_temp;
     p_temp += seq_len * dim_hidden;
 
     // First layer: (T, D) * (Dh, D) => (T, Dh)
     for (int32_t i = 0; i < seq_len; i++) {
-        ret |= API_LIB(split_mat_mul_bias_i8i8i32o8)(p_weight_m0, p_input + i * dim_in, p_bias_m0, 
+        THINKER_RET_CHECK(API_LIB(split_mat_mul_bias_i8i8i32o8)(p_weight_m0, p_input + i * dim_in, p_bias_m0, 
                                                       p_output1 + i * dim_hidden, dim_hidden, dim_in, 1, 
-                                                      q_input_m0 + q_weight_m0 - q_output_m0);
+                                                      q_input_m0 + q_weight_m0 - q_output_m0), "luna_split_mat_mul_bias_i8i8i32o8");
     }
 
     // Apply ReLU activation
-    ret |= API_LIB(relu_i8o8)(p_output1, p_output1, seq_len * dim_hidden, 0);
+    THINKER_RET_CHECK(API_LIB(relu_i8o8)(p_output1, p_output1, seq_len * dim_hidden, 0), "luna_relu_i8o8");
 
     // Second layer: (T, Dh) * (Do, Dh) => (T, Do)
     for (int32_t i = 0; i < seq_len; i++) {
-        ret |= API_LIB(split_mat_mul_bias_i8i8i32o8)(p_weight_m1, p_output1 + i * dim_hidden, p_bias_m1, 
+        THINKER_RET_CHECK(API_LIB(split_mat_mul_bias_i8i8i32o8)(p_weight_m1, p_output1 + i * dim_hidden, p_bias_m1, 
                                                       p_output + i * dim_out, dim_out, dim_hidden, 1, 
-                                                      q_input_m1 + q_weight_m1 - q_output_m1);
+                                                      q_input_m1 + q_weight_m1 - q_output_m1), "luna_split_mat_mul_bias_i8i8i32o8");
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 /**
@@ -81,8 +80,6 @@ int32_t luna_ffn_int_trans(int8_t *p_input,
  */
 int32_t ffnint_luna(tTensor *X, tTensor *weight1, tTensor *bias1, tTensor *weight2, tTensor *bias2, 
                     tTensor *workspace, tTensor *Y, FFNIntAttrs *attrs) {
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
-
     int8_t *p_input = (int8_t *)X->dptr_;
     int8_t *p_weight_m0 = (int8_t *)weight1->dptr_;
     int8_t *p_weight_m1 = (int8_t *)weight2->dptr_;
@@ -90,11 +87,11 @@ int32_t ffnint_luna(tTensor *X, tTensor *weight1, tTensor *bias1, tTensor *weigh
 
     int32_t *p_bias_m0 = (int32_t *)workspace->dptr_;
     uint32_t size_bias = getShapeSize(&(bias1->shape_)) * sizeof(int32_t);
-    API_LIB(memcpy_i8o8)((int8_t *)p_bias_m0, (int8_t *)bias1->dptr_, size_bias);
+    THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)p_bias_m0, (int8_t *)bias1->dptr_, size_bias), "luna_memcpy_i8o8");
 
     int32_t *p_bias_m1 = (int32_t *)workspace->dptr_ + getShapeSize(&(bias1->shape_));
     size_bias = getShapeSize(&(bias2->shape_)) * sizeof(int32_t);
-    API_LIB(memcpy_i8o8)((int8_t *)p_bias_m1, (int8_t *)bias2->dptr_, size_bias);
+    THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)p_bias_m1, (int8_t *)bias2->dptr_, size_bias), "luna_memcpy_i8o8");
 
     int8_t *p_temp = (int8_t *)p_bias_m1 + getShapeSize(&(bias2->shape_)) * 4;
 
@@ -111,17 +108,17 @@ int32_t ffnint_luna(tTensor *X, tTensor *weight1, tTensor *bias1, tTensor *weigh
     int32_t q_output_m1 = Y->scale_;
 
 #if (defined(WIN32) || defined(linux))
-    ret = luna_ffn_int_trans(p_input, p_weight_m0, p_bias_m0, p_weight_m1, p_bias_m1, p_output, p_temp,
+    THINKER_RET_CHECK(luna_ffn_int_trans(p_input, p_weight_m0, p_bias_m0, p_weight_m1, p_bias_m1, p_output, p_temp,
                             dim_in, dim_hidden, dim_out, seq_len, q_input_m0, q_weight_m0, q_output_m0,
-                            q_input_m1, q_weight_m1, q_output_m1);
+                            q_input_m1, q_weight_m1, q_output_m1), "luna_ffn_int_trans");
 #else
 #include "lunaext_ffn.h"
-    ret = nlang_ffn_int_trans(p_input, p_weight_m0, p_bias_m0, p_weight_m1, p_bias_m1, p_output, p_temp,
+    THINKER_RET_CHECK(nlang_ffn_int_trans(p_input, p_weight_m0, p_bias_m0, p_weight_m1, p_bias_m1, p_output, p_temp,
                             dim_in, dim_hidden, dim_out, seq_len, q_input_m0, q_weight_m0, q_output_m0,
-                            q_input_m1, q_weight_m1, q_output_m1);
+                            q_input_m1, q_weight_m1, q_output_m1), "nlang_ffn_int_trans");
 #endif
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif  // _FFNINT_LUNA_H_

@@ -28,7 +28,7 @@ int32_t flatten_luna(tTensor *X, tTensor *Y, FlattenAttrs *attr) {
     if ((X->mem_.type_ == 2) && (Y->mem_.type_ == 2)) {
         if (input != output) {
             size_t size = getTensorSize(X);
-            API_LIB(memcpy)(output, input, X->byte_ * size);  // Use NNBLAS memcpy
+            THINKER_RET_CHECK(API_LIB(memcpy)(output, input, X->byte_ * size), "luna_memcpy");  // Use NNBLAS memcpy
         }
     } else {
         if (input != output) {

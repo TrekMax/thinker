@@ -38,13 +38,11 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
         step = (int32_t)(((int64_t *)(tensors[4]->dptr_))[0]);
     }
 
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
-
 #if THINKER_USE_VENUS || THINKER_USE_ARCS || THINKER_USE_VENUSA
 #if THINKER_PROFILE
     uint64_t start_t = tick_count();  // Start profiling
 #endif
-    ret = slice_luna(tensors[0], start, end, axis, step, tensors[op->num_input_]);  // Execute slice operation
+    THINKER_RET_CHECK(slice_luna(tensors[0], start, end, axis, step, tensors[op->num_input_]), "slice_luna");  // Execute slice operation
 #if THINKER_PROFILE
     uint64_t finish_t = tick_count();
     uint32_t total_t = (uint32_t)(finish_t - start_t);
@@ -52,7 +50,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
 #endif
 #endif
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #include "core/operator_template.h"

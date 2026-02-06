@@ -78,15 +78,9 @@ class Conv2dIntAttrs(OperatorAttrs):
         assert strides[1] in {1, 2, 4}, "Stride height exceeds limit"
 
         # Additional checks
-        assert (
-            kernels[0] >= strides[0] and kernels[1] >= strides[1]
-        ), "Kernel size must be >= stride size"
-        assert (
-            pads[0] <= kernels[0] and pads[2] <= kernels[0]
-        ), "Pad width exceeds kernel width"
-        assert (
-            pads[1] <= kernels[1] and pads[3] <= kernels[1]
-        ), "Pad height exceeds kernel height"
+        assert (kernels[0] >= strides[0] and kernels[1] >= strides[1]), "Kernel size must be >= stride size"
+        assert (pads[0] <= kernels[0] and pads[2] <= kernels[0]), "Pad width exceeds kernel width"
+        assert (pads[1] <= kernels[1] and pads[3] <= kernels[1]), "Pad height exceeds kernel height"
 
     def serialize(self) -> bytes:
         """Serialize the attributes into bytes for the Conv2dInt operation."""

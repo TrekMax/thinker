@@ -21,7 +21,6 @@
  * @return int32_t Operation status
  */
 int32_t iqsigmoid(tTensor *X, tTensor *Y, tTensor *Temp) {
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
     uint32_t input_size = getTensorSize(X);
     uint32_t workspace_size = getTensorSize(Temp);
 
@@ -46,11 +45,24 @@ int32_t iqsigmoid(tTensor *X, tTensor *Y, tTensor *Temp) {
     uint32_t shift = Q_INPUT - x_q;
 
     // Perform quantized sigmoid computation
-    ret = API_LIB(scale_i8i8o16)(src, 1, tmp, input_size, 0);  // Convert Int8 to Int16
-    ret |= API_LIB(scale_i16i16o32)(tmp, 1UL << shift, tmp1, input_size, 0);  // Scale to Int32
-    ret |= API_LIB(sigmoid_i32o8)(tmp1, dst, input_size);  // Apply sigmoid activation and convert to Int8
+    if (X->dtype_ == Int8) {
+        THINKER_RET_CHECK(API_LIB(scale_i8i8o16)(src, 1, tmp, input_size, 0), "luna_scale_i8i8o16");  // Convert Int8 to Int16
+        THINKER_RET_CHECK(API_LIB(scale_i16i16o32)(tmp, 1UL << shift, tmp1, input_size, 0), "luna_scale_i16i16o32");  // Scale to Int32
+        THINKER_RET_CHECK(API_LIB(sigmoid_i32o8)(tmp1, dst, input_size), "luna_sigmoid_i32o8");  // Apply sigmoid activation and convert to Int8
+    }
+    else if (X->dtype_ == Int16) {
+        THINKER_RET_CHECK(API_LIB(scale_i16i16o32)(src, 1 << shift, tmp1, input_size, 0), "luna_scale_i16i16o32");  // Scale to Int32
+        THINKER_RET_CHECK(API_LIB(sigmoid_i32o8)(tmp1, dst, input_size), "luna_sigmoid_i32o8");  // Apply sigmoid activation and convert to Int8
+    }
+    else if (X->dtype_ == Int32) {
+        if (shift != 0)
+            THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(src, 1 << shift, tmp1, input_size, 0), "luna_scale_i32i32o32");  // Scale to Int32
+        THINKER_RET_CHECK(API_LIB(sigmoid_i32o8)(src, dst, input_size), "luna_sigmoid_i32o8");  // Apply sigmoid activation and convert to Int8
+    }
+    else 
+        return T_ERR_INVALID_DATATYPE;
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif  // _SIGMOID_LUNA_H_

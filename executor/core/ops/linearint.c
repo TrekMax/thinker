@@ -32,7 +32,6 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     
     // Get linear transformation attributes
     LinearIntAttrs *attrs = (LinearIntAttrs *)((int8_t *)op + op->attr_offset_);
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
     
     // Get input, weight, output tensors
     tTensor *input = tensors[0];
@@ -71,7 +70,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
             bias->dptr_ = (addr_type)((int8_t *)dma_buffer->dptr_ + ALIGN16(size));
         }
         
-        ret = linearint_luna(input, weight, bias, attrs, workspace, output);
+        THINKER_RET_CHECK(linearint_luna(input, weight, bias, attrs, workspace, output), "linearint_luna");
     } else {
         if (3 == op->num_input_) {
             bias = ((tTensor **)tensors)[op->num_input_ - 1];
@@ -80,7 +79,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
         if (num_tensor == op->num_input_ + op->num_output_ + 1) {
             workspace = ((tTensor **)tensors)[op->num_input_ + op->num_output_];
         }
-        ret = linearint_luna(input, weight, bias, attrs, workspace, output);
+        THINKER_RET_CHECK(linearint_luna(input, weight, bias, attrs, workspace, output), "linearint_luna");
     }
 
 #if THINKER_PROFILE
@@ -90,7 +89,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
 #endif
 #endif
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #include "core/operator_template.h"

@@ -124,24 +124,24 @@ static int32_t GetNearestPixelFunc(float x, nearestMode nmode) {
  * @param input Input tensor data
  * @param output Output tensor data
  * @param scale Scale factors
- * @param dims_original Original dimensions
- * @param dims_resized Resized dimensions
+ * @param dims_ori Original dimensions
+ * @param dims_new Resized dimensions
  * @param roi Region of interest
  * @param ctm Coordinate transformation mode
  * @param nmode Nearest neighbor mode
  * @return int32_t Execution status
  */
 static int32_t Resize_nearest_float4d(float *input, float *output, float *scale,
-                                      int32_t *dims_original, int32_t *dims_resized,
-                                      int32_t *roi, ctmode ctm, nearestMode nmode) {
+                                      uint32_t *dims_ori, uint32_t *dims_new,
+                                      uint32_t *roi, ctmode ctm, nearestMode nmode) {
     int32_t scaleh_i = (int32_t)scale[2];
     int32_t scalew_i = (int32_t)scale[3];
     
     if (ctm == kasymmetric && nmode == kfloor && scalew_i == scaleh_i &&
         scalew_i == scale[3] && scaleh_i == scale[2] && scalew_i > 1) {
-        int32_t b_c = dims_resized[0] * dims_resized[1];
-        int32_t out_h = dims_resized[2], in_h = dims_original[2];
-        int32_t out_w = dims_resized[3], in_w = dims_original[3];
+        int32_t b_c = dims_new[0] * dims_new[1];
+        int32_t out_h = dims_new[2], in_h = dims_ori[2];
+        int32_t out_w = dims_new[3], in_w = dims_ori[3];
         for (int32_t b = 0; b < b_c; ++b) {
             const float *in_dptr = input + b * in_h * in_w;
             float *out_dptr = output + b * out_h * out_w;
@@ -152,20 +152,20 @@ static int32_t Resize_nearest_float4d(float *input, float *output, float *scale,
             }
         }
     } else if (ctm == khalf_pixel && nmode == kfloor) {
-        int32_t b_c = dims_resized[0] * dims_resized[1];
+        int32_t b_c = dims_new[0] * dims_new[1];
         for (int32_t b = 0; b < b_c; ++b) {
-            for (int32_t h = 0; h < dims_resized[2]; ++h) {
+            for (int32_t h = 0; h < dims_new[2]; ++h) {
                 float th = ((float)h + 0.5) / scale[2] - 0.5;
                 int32_t h_original = (int32_t)floor(th);
                 if (h_original < 0) {
                     h_original = 0;
-                } else if (h_original > dims_original[2] - 1) {
-                    h_original = dims_original[2] - 1;
+                } else if (h_original > dims_ori[2] - 1) {
+                    h_original = dims_ori[2] - 1;
                 }
-                for (int32_t w = 0; w < dims_resized[3]; ++w) {
+                for (int32_t w = 0; w < dims_new[3]; ++w) {
                     float tw = ((float)w + 0.5) / scale[3] - 0.5;
                     int32_t w_original = (int32_t)floor(tw);
-                    int32_t W = dims_original[3];
+                    int32_t W = dims_ori[3];
                     if (w_original < 0) {
                         w_original = 0;
                     } else if (w_original >= W) {
@@ -175,23 +175,23 @@ static int32_t Resize_nearest_float4d(float *input, float *output, float *scale,
                     ++output;
                 }
             }
-            input += dims_original[2] * dims_original[3];
+            input += dims_ori[2] * dims_ori[3];
         }
     } else if (ctm == kpytorch_half_pixel && nmode == kfloor) {
-        int32_t b_c = dims_resized[0] * dims_resized[1];
+        int32_t b_c = dims_new[0] * dims_new[1];
         for (int32_t b = 0; b < b_c; ++b) {
-            for (int32_t h = 0; h < dims_resized[2]; ++h) {
-                float th = dims_resized[2] > 1 ? ((float)h + 0.5) / scale[2] - 0.5 : 0;
+            for (int32_t h = 0; h < dims_new[2]; ++h) {
+                float th = dims_new[2] > 1 ? ((float)h + 0.5) / scale[2] - 0.5 : 0;
                 int32_t h_original = (int32_t)floor(th);
                 if (h_original < 0) {
                     h_original = 0;
-                } else if (h_original > dims_original[2] - 1) {
-                    h_original = dims_original[2] - 1;
+                } else if (h_original > dims_ori[2] - 1) {
+                    h_original = dims_ori[2] - 1;
                 }
-                for (int32_t w = 0; w < dims_resized[3]; ++w) {
-                    float tw = dims_resized[3] > 1 ? ((float)w + 0.5) / scale[3] - 0.5 : 0;
+                for (int32_t w = 0; w < dims_new[3]; ++w) {
+                    float tw = dims_new[3] > 1 ? ((float)w + 0.5) / scale[3] - 0.5 : 0;
                     int32_t w_original = (int32_t)floor(tw);
-                    int32_t W = dims_original[3];
+                    int32_t W = dims_ori[3];
                     if (w_original < 0) {
                         w_original = 0;
                     } else if (w_original >= W) {
@@ -201,32 +201,32 @@ static int32_t Resize_nearest_float4d(float *input, float *output, float *scale,
                     ++output;
                 }
             }
-            input += dims_original[2] * dims_original[3];
+            input += dims_ori[2] * dims_ori[3];
         }
     } else if (ctm == ktf_crop_and_resize && nmode == kfloor) {
-        int32_t b_c = dims_resized[0] * dims_resized[1];
+        int32_t b_c = dims_new[0] * dims_new[1];
         for (int32_t b = 0; b < b_c; ++b) {
-            for (int32_t h = 0; h < dims_resized[2]; ++h) {
-                float th = dims_resized[2] > 1
-                            ? roi[2] * (dims_original[2] - 1) +
+            for (int32_t h = 0; h < dims_new[2]; ++h) {
+                float th = dims_new[2] > 1
+                            ? roi[2] * (dims_ori[2] - 1) +
                                (float)h * (roi[6] - roi[2]) *
-                                   (dims_original[2] - 1) / (dims_resized[2] - 1)
-                            : 0.5 * (roi[2] + roi[6]) * (dims_resized[2] - 1);
+                                   (dims_ori[2] - 1) / (dims_new[2] - 1)
+                            : 0.5 * (roi[2] + roi[6]) * (dims_new[2] - 1);
                 int32_t h_original = (int32_t)floor(th);
                 if (h_original < 0) {
                     h_original = 0;
-                } else if (h_original > dims_original[2] - 1) {
-                    h_original = dims_original[2] - 1;
+                } else if (h_original > dims_ori[2] - 1) {
+                    h_original = dims_ori[2] - 1;
                 }
-                for (int32_t w = 0; w < dims_resized[3]; ++w) {
-                    float tw = dims_resized[3] > 1
-                                ? roi[3] * (dims_original[3] - 1) +
+                for (int32_t w = 0; w < dims_new[3]; ++w) {
+                    float tw = dims_new[3] > 1
+                                ? roi[3] * (dims_ori[3] - 1) +
                                    (float)w * (roi[7] - roi[3]) *
-                                       (dims_original[3] - 1) /
-                                       (dims_resized[3] - 1)
-                                : 0.5 * (roi[3] + roi[7]) * (dims_resized[3] - 1);
+                                       (dims_ori[3] - 1) /
+                                       (dims_new[3] - 1)
+                                : 0.5 * (roi[3] + roi[7]) * (dims_new[3] - 1);
                     int32_t w_original = (int32_t)floor(tw);
-                    int32_t W = dims_original[3];
+                    int32_t W = dims_ori[3];
                     if (w_original < 0) {
                         w_original = 0;
                     } else if (w_original >= W) {
@@ -236,23 +236,23 @@ static int32_t Resize_nearest_float4d(float *input, float *output, float *scale,
                     ++output;
                 }
             }
-            input += dims_original[2] * dims_original[3];
+            input += dims_ori[2] * dims_ori[3];
         }
     } else if (ctm == kalign_corners && nmode == kfloor) {
-        int32_t b_c = dims_resized[0] * dims_resized[1];
+        int32_t b_c = dims_new[0] * dims_new[1];
         for (int32_t b = 0; b < b_c; ++b) {
-            for (int32_t h = 0; h < dims_resized[2]; ++h) {
-                float th = (float)h * (dims_original[2] - 1) / (dims_resized[2] - 1);
+            for (int32_t h = 0; h < dims_new[2]; ++h) {
+                float th = (float)h * (dims_ori[2] - 1) / (dims_new[2] - 1);
                 int32_t h_original = (int32_t)floor(th);
                 if (h_original < 0) {
                     h_original = 0;
-                } else if (h_original > dims_original[2] - 1) {
-                    h_original = dims_original[2] - 1;
+                } else if (h_original > dims_ori[2] - 1) {
+                    h_original = dims_ori[2] - 1;
                 }
-                for (int32_t w = 0; w < dims_resized[3]; ++w) {
-                    float tw = (float)w * (dims_original[3] - 1) / (dims_resized[3] - 1);
+                for (int32_t w = 0; w < dims_new[3]; ++w) {
+                    float tw = (float)w * (dims_ori[3] - 1) / (dims_new[3] - 1);
                     int32_t w_original = (int32_t)floor(tw);
-                    int32_t W = dims_original[3];
+                    int32_t W = dims_ori[3];
                     if (w_original < 0) {
                         w_original = 0;
                     } else if (w_original >= W) {
@@ -262,25 +262,25 @@ static int32_t Resize_nearest_float4d(float *input, float *output, float *scale,
                     ++output;
                 }
             }
-            input += dims_original[2] * dims_original[3];
+            input += dims_ori[2] * dims_ori[3];
         }
     } else {
-        for (int32_t n = 0; n < dims_resized[0]; ++n) {
-            for (int32_t c = 0; c < dims_resized[1]; ++c) {
-                for (int32_t h = 0; h < dims_resized[2]; ++h) {
-                    float th = GetCoordinateFunc(h, ctm, scale[2], dims_original[2],
-                                                dims_resized[2], roi[2], roi[6]);
+        for (int32_t n = 0; n < dims_new[0]; ++n) {
+            for (int32_t c = 0; c < dims_new[1]; ++c) {
+                for (int32_t h = 0; h < dims_new[2]; ++h) {
+                    float th = GetCoordinateFunc(h, ctm, scale[2], dims_ori[2],
+                                                dims_new[2], roi[2], roi[6]);
                     int32_t h_original = GetNearestPixelFunc(th, nmode);
                     if (h_original < 0) {
                         h_original = 0;
-                    } else if (h_original > dims_original[2] - 1) {
-                        h_original = dims_original[2] - 1;
+                    } else if (h_original > dims_ori[2] - 1) {
+                        h_original = dims_ori[2] - 1;
                     }
-                    for (int32_t w = 0; w < dims_resized[3]; ++w) {
-                        float tw = GetCoordinateFunc(w, ctm, scale[3], dims_original[3],
-                                                    dims_resized[3], roi[3], roi[7]);
+                    for (int32_t w = 0; w < dims_new[3]; ++w) {
+                        float tw = GetCoordinateFunc(w, ctm, scale[3], dims_ori[3],
+                                                    dims_new[3], roi[3], roi[7]);
                         int32_t w_original = GetNearestPixelFunc(tw, nmode);
-                        int32_t W = dims_original[3];
+                        int32_t W = dims_ori[3];
                         if (w_original < 0) {
                             w_original = 0;
                         } else if (w_original >= W) {
@@ -290,7 +290,7 @@ static int32_t Resize_nearest_float4d(float *input, float *output, float *scale,
                         ++output;
                     }
                 }
-                input += dims_original[2] * dims_original[3];
+                input += dims_ori[2] * dims_ori[3];
             }
         }
     }
@@ -298,38 +298,38 @@ static int32_t Resize_nearest_float4d(float *input, float *output, float *scale,
 }
 
 static int32_t Resize_nearest_float3d(float *input, float *output, float *scale,
-                               int32_t *dims_original, int32_t *dims_resized,
-                               int32_t *roi, ctmode ctm, nearestMode nmode) 
+                               uint32_t *dims_ori, uint32_t *dims_new,
+                               uint32_t *roi, ctmode ctm, nearestMode nmode) 
 {
-  for (int32_t n = 0; n < dims_resized[0]; ++n) {
-    for (int32_t c = 0; c < dims_resized[1]; ++c) {
-      for (int32_t h = 0; h < dims_resized[2]; ++h) {
-        float th = GetCoordinateFunc(h, ctm, scale[2], dims_original[2],
-                                     dims_resized[2], roi[2], roi[6]);
+  for (int32_t n = 0; n < dims_new[0]; ++n) {
+    for (int32_t c = 0; c < dims_new[1]; ++c) {
+      for (int32_t h = 0; h < dims_new[2]; ++h) {
+        float th = GetCoordinateFunc(h, ctm, scale[2], dims_ori[2],
+                                     dims_new[2], roi[2], roi[6]);
         int32_t h_original = GetNearestPixelFunc(th, nmode);
         if (h_original < 0)
           h_original = 0;
-        else if (h_original > dims_original[2] - 1)
-          h_original = dims_original[2] - 1;
+        else if (h_original > dims_ori[2] - 1)
+          h_original = dims_ori[2] - 1;
 
         output[0] = input[h_original];
         ++output;
       }
-      input += dims_original[2];
+      input += dims_ori[2];
     }
   }
   return 0;
 }
 
 static int32_t Resize_linear_float(float *input, float *output, float *scale,
-                            int32_t *dims_original, int32_t *dims_resized,
-                            int32_t *roi, ctmode ctm) 
+                            uint32_t *dims_ori, uint32_t *dims_new,
+                            uint32_t *roi, ctmode ctm) 
 {
   if (ctm == kasymmetric) {
-    int32_t b_c = dims_resized[0] * dims_resized[1];
+    int32_t b_c = dims_new[0] * dims_new[1];
     for (int32_t b = 0; b < b_c; ++b) {
-      for (int32_t h = 0; h < dims_resized[2]; ++h) {
-        for (int32_t w = 0; w < dims_resized[3]; ++w) {
+      for (int32_t h = 0; h < dims_new[2]; ++h) {
+        for (int32_t w = 0; w < dims_new[3]; ++w) {
           float h_original = (float)h / scale[2];
           float w_original = (float)w / scale[3];
           float x = w_original, y = h_original;
@@ -337,16 +337,16 @@ static int32_t Resize_linear_float(float *input, float *output, float *scale,
           // 如果值在[0,H-1]或[0,W-1]之外
           if (x < 0)
             x0 = x1 = 0;
-          else if (x > dims_original[3] - 1)
-            x0 = x1 = dims_original[3] - 1;
+          else if (x > dims_ori[3] - 1)
+            x0 = x1 = dims_ori[3] - 1;
           else {
             x0 = (int32_t)w_original;
             x1 = x0 + 1;
           }
           if (y < 0)
             y0 = y1 = 0;
-          else if (y > dims_original[2] - 1)
-            y0 = y1 = dims_original[2] - 1;
+          else if (y > dims_ori[2] - 1)
+            y0 = y1 = dims_ori[2] - 1;
           else {
             y0 = (int32_t)h_original;
             y1 = y0 + 1;
@@ -361,21 +361,21 @@ static int32_t Resize_linear_float(float *input, float *output, float *scale,
           float wJ = (1 - wy) * wx;
           float wH = wy * (1 - wx);
           float wG = wx * wy;
-          int32_t W = dims_original[3];
+          int32_t W = dims_ori[3];
           // todo: 加上exclude_outside系数
           float value = wI * input[x0 + y0 * W] + wJ * input[x1 + y0 * W] +
                         wH * input[x0 + y1 * W] + wG * input[x1 + y1 * W];
           output[0] = value;
           ++output;
         }
-        input += dims_original[2] * dims_original[3];
+        input += dims_ori[2] * dims_ori[3];
       }
     }
   } else if (ctm == khalf_pixel) {
-    int32_t b_c = dims_resized[0] * dims_resized[1];
+    int32_t b_c = dims_new[0] * dims_new[1];
     for (int32_t b = 0; b < b_c; ++b) {
-      for (int32_t h = 0; h < dims_resized[2]; ++h) {
-        for (int32_t w = 0; w < dims_resized[3]; ++w) {
+      for (int32_t h = 0; h < dims_new[2]; ++h) {
+        for (int32_t w = 0; w < dims_new[3]; ++w) {
           float h_original = ((float)h + 0.5) / scale[2] - 0.5;
           float w_original = ((float)w + 0.5) / scale[3] - 0.5;
           float x = w_original, y = h_original;
@@ -383,16 +383,16 @@ static int32_t Resize_linear_float(float *input, float *output, float *scale,
           // 如果值在[0,H-1]或[0,W-1]之外
           if (x < 0)
             x0 = x1 = 0;
-          else if (x > dims_original[3] - 1)
-            x0 = x1 = dims_original[3] - 1;
+          else if (x > dims_ori[3] - 1)
+            x0 = x1 = dims_ori[3] - 1;
           else {
             x0 = (int32_t)w_original;
             x1 = x0 + 1;
           }
           if (y < 0)
             y0 = y1 = 0;
-          else if (y > dims_original[2] - 1)
-            y0 = y1 = dims_original[2] - 1;
+          else if (y > dims_ori[2] - 1)
+            y0 = y1 = dims_ori[2] - 1;
           else {
             y0 = (int32_t)h_original;
             y1 = y0 + 1;
@@ -407,40 +407,40 @@ static int32_t Resize_linear_float(float *input, float *output, float *scale,
           float wJ = (1 - wy) * wx;
           float wH = wy * (1 - wx);
           float wG = wx * wy;
-          int32_t W = dims_original[3];
+          int32_t W = dims_ori[3];
           // todo: 加上exclude_outside系数
           float value = wI * input[x0 + y0 * W] + wJ * input[x1 + y0 * W] +
                         wH * input[x0 + y1 * W] + wG * input[x1 + y1 * W];
           output[0] = value;
           ++output;
         }
-        input += dims_original[2] * dims_original[3];
+        input += dims_ori[2] * dims_ori[3];
       }
     }
   } else if (ctm == kpytorch_half_pixel) {
-    int32_t b_c = dims_resized[0] * dims_resized[1];
+    int32_t b_c = dims_new[0] * dims_new[1];
     for (int32_t b = 0; b < b_c; ++b) {
-      for (int32_t h = 0; h < dims_resized[2]; ++h) {
-        for (int32_t w = 0; w < dims_resized[3]; ++w) {
+      for (int32_t h = 0; h < dims_new[2]; ++h) {
+        for (int32_t w = 0; w < dims_new[3]; ++w) {
           float h_original =
-              dims_resized[2] > 1 ? ((float)h + 0.5) / scale[2] - 0.5 : 0;
+              dims_new[2] > 1 ? ((float)h + 0.5) / scale[2] - 0.5 : 0;
           float w_original =
-              dims_resized[3] > 1 ? ((float)w + 0.5) / scale[3] - 0.5 : 0;
+              dims_new[3] > 1 ? ((float)w + 0.5) / scale[3] - 0.5 : 0;
           float x = w_original, y = h_original;
           int32_t x0, x1, y0, y1;
           // 如果值在[0,H-1]或[0,W-1]之外
           if (x < 0)
             x0 = x1 = 0;
-          else if (x > dims_original[3] - 1)
-            x0 = x1 = dims_original[3] - 1;
+          else if (x > dims_ori[3] - 1)
+            x0 = x1 = dims_ori[3] - 1;
           else {
             x0 = (int32_t)w_original;
             x1 = x0 + 1;
           }
           if (y < 0)
             y0 = y1 = 0;
-          else if (y > dims_original[2] - 1)
-            y0 = y1 = dims_original[2] - 1;
+          else if (y > dims_ori[2] - 1)
+            y0 = y1 = dims_ori[2] - 1;
           else {
             y0 = (int32_t)h_original;
             y1 = y0 + 1;
@@ -455,40 +455,40 @@ static int32_t Resize_linear_float(float *input, float *output, float *scale,
           float wJ = (1 - wy) * wx;
           float wH = wy * (1 - wx);
           float wG = wx * wy;
-          int32_t W = dims_original[3];
+          int32_t W = dims_ori[3];
           // todo: 加上exclude_outside系数
           float value = wI * input[x0 + y0 * W] + wJ * input[x1 + y0 * W] +
                         wH * input[x0 + y1 * W] + wG * input[x1 + y1 * W];
           output[0] = value;
           ++output;
         }
-        input += dims_original[2] * dims_original[3];
+        input += dims_ori[2] * dims_ori[3];
       }
     }
   } else if (ctm == kalign_corners) {
-    int32_t b_c = dims_resized[0] * dims_resized[1];
+    int32_t b_c = dims_new[0] * dims_new[1];
     for (int32_t b = 0; b < b_c; ++b) {
-      for (int32_t h = 0; h < dims_resized[2]; ++h) {
-        for (int32_t w = 0; w < dims_resized[3]; ++w) {
+      for (int32_t h = 0; h < dims_new[2]; ++h) {
+        for (int32_t w = 0; w < dims_new[3]; ++w) {
           float h_original =
-              (float)h * (dims_original[2] - 1) / (dims_original[2] - 1);
+              (float)h * (dims_ori[2] - 1) / (dims_ori[2] - 1);
           float w_original =
-              (float)w * (dims_original[3] - 1) / (dims_original[3] - 1);
+              (float)w * (dims_ori[3] - 1) / (dims_ori[3] - 1);
           float x = w_original, y = h_original;
           int32_t x0, x1, y0, y1;
           // 如果值在[0,H-1]或[0,W-1]之外
           if (x < 0)
             x0 = x1 = 0;
-          else if (x > dims_original[3] - 1)
-            x0 = x1 = dims_original[3] - 1;
+          else if (x > dims_ori[3] - 1)
+            x0 = x1 = dims_ori[3] - 1;
           else {
             x0 = (int32_t)w_original;
             x1 = x0 + 1;
           }
           if (y < 0)
             y0 = y1 = 0;
-          else if (y > dims_original[2] - 1)
-            y0 = y1 = dims_original[2] - 1;
+          else if (y > dims_ori[2] - 1)
+            y0 = y1 = dims_ori[2] - 1;
           else {
             y0 = (int32_t)h_original;
             y1 = y0 + 1;
@@ -503,49 +503,49 @@ static int32_t Resize_linear_float(float *input, float *output, float *scale,
           float wJ = (1 - wy) * wx;
           float wH = wy * (1 - wx);
           float wG = wx * wy;
-          int32_t W = dims_original[3];
+          int32_t W = dims_ori[3];
           // todo: 加上exclude_outside系数
           float value = wI * input[x0 + y0 * W] + wJ * input[x1 + y0 * W] +
                         wH * input[x0 + y1 * W] + wG * input[x1 + y1 * W];
           output[0] = value;
           ++output;
         }
-        input += dims_original[2] * dims_original[3];
+        input += dims_ori[2] * dims_ori[3];
       }
     }
   } else if (ctm == ktf_crop_and_resize) {
-    int32_t b_c = dims_resized[0] * dims_resized[1];
+    int32_t b_c = dims_new[0] * dims_new[1];
     for (int32_t b = 0; b < b_c; ++b) {
-      for (int32_t h = 0; h < dims_resized[2]; ++h) {
-        for (int32_t w = 0; w < dims_resized[3]; ++w) {
+      for (int32_t h = 0; h < dims_new[2]; ++h) {
+        for (int32_t w = 0; w < dims_new[3]; ++w) {
           float h_original =
-              dims_resized[2] > 1
-                  ? roi[2] * (dims_original[2] - 1) +
-                        (float)h * (roi[6] - roi[2]) * (dims_original[2] - 1) /
-                            (dims_resized[2] - 1)
-                  : 0.5 * (roi[2] + roi[6]) * (dims_original[2] - 1);
+              dims_new[2] > 1
+                  ? roi[2] * (dims_ori[2] - 1) +
+                        (float)h * (roi[6] - roi[2]) * (dims_ori[2] - 1) /
+                            (dims_new[2] - 1)
+                  : 0.5 * (roi[2] + roi[6]) * (dims_ori[2] - 1);
 
           float w_original =
-              dims_resized[3] > 1
-                  ? roi[3] * (dims_original[3] - 1) +
-                        (float)w * (roi[7] - roi[3]) * (dims_original[3] - 1) /
-                            (dims_resized[3] - 1)
-                  : 0.5 * (roi[3] + roi[7]) * (dims_original[3] - 1);
+              dims_new[3] > 1
+                  ? roi[3] * (dims_ori[3] - 1) +
+                        (float)w * (roi[7] - roi[3]) * (dims_ori[3] - 1) /
+                            (dims_new[3] - 1)
+                  : 0.5 * (roi[3] + roi[7]) * (dims_ori[3] - 1);
           float x = w_original, y = h_original;
           int32_t x0, x1, y0, y1;
           // 如果值在[0,H-1]或[0,W-1]之外
           if (x < 0)
             x0 = x1 = 0;
-          else if (x > dims_original[3] - 1)
-            x0 = x1 = dims_original[3] - 1;
+          else if (x > dims_ori[3] - 1)
+            x0 = x1 = dims_ori[3] - 1;
           else {
             x0 = (int32_t)w_original;
             x1 = x0 + 1;
           }
           if (y < 0)
             y0 = y1 = 0;
-          else if (y > dims_original[2] - 1)
-            y0 = y1 = dims_original[2] - 1;
+          else if (y > dims_ori[2] - 1)
+            y0 = y1 = dims_ori[2] - 1;
           else {
             y0 = (int32_t)h_original;
             y1 = y0 + 1;
@@ -560,42 +560,42 @@ static int32_t Resize_linear_float(float *input, float *output, float *scale,
           float wJ = (1 - wy) * wx;
           float wH = wy * (1 - wx);
           float wG = wx * wy;
-          int32_t W = dims_original[3];
+          int32_t W = dims_ori[3];
           // todo: 加上exclude_outside系数
           float value = wI * input[x0 + y0 * W] + wJ * input[x1 + y0 * W] +
                         wH * input[x0 + y1 * W] + wG * input[x1 + y1 * W];
           output[0] = value;
           ++output;
         }
-        input += dims_original[2] * dims_original[3];
+        input += dims_ori[2] * dims_ori[3];
       }
     }
   } else {
-    for (int32_t n = 0; n < dims_resized[0]; ++n) {
-      for (int32_t c = 0; c < dims_resized[1]; ++c) {
-        for (int32_t h = 0; h < dims_resized[2]; ++h)
-          for (int32_t w = 0; w < dims_resized[3]; ++w) {
+    for (int32_t n = 0; n < dims_new[0]; ++n) {
+      for (int32_t c = 0; c < dims_new[1]; ++c) {
+        for (int32_t h = 0; h < dims_new[2]; ++h)
+          for (int32_t w = 0; w < dims_new[3]; ++w) {
             float h_original =
-                GetCoordinateFunc(h, ctm, scale[2], dims_original[2],
-                                  dims_resized[2], roi[2], roi[6]);
+                GetCoordinateFunc(h, ctm, scale[2], dims_ori[2],
+                                  dims_new[2], roi[2], roi[6]);
             float w_original =
-                GetCoordinateFunc(w, ctm, scale[3], dims_original[3],
-                                  dims_resized[3], roi[3], roi[7]);
+                GetCoordinateFunc(w, ctm, scale[3], dims_ori[3],
+                                  dims_new[3], roi[3], roi[7]);
             float x = w_original, y = h_original;
             int32_t x0, x1, y0, y1;
             // 如果值在[0,H-1]或[0,W-1]之外
             if (x < 0)
               x0 = x1 = 0;
-            else if (x > dims_original[3] - 1)
-              x0 = x1 = dims_original[3] - 1;
+            else if (x > dims_ori[3] - 1)
+              x0 = x1 = dims_ori[3] - 1;
             else {
               x0 = (int32_t)w_original;
               x1 = x0 + 1;
             }
             if (y < 0)
               y0 = y1 = 0;
-            else if (y > dims_original[2] - 1)
-              y0 = y1 = dims_original[2] - 1;
+            else if (y > dims_ori[2] - 1)
+              y0 = y1 = dims_ori[2] - 1;
             else {
               y0 = (int32_t)h_original;
               y1 = y0 + 1;
@@ -610,14 +610,14 @@ static int32_t Resize_linear_float(float *input, float *output, float *scale,
             float wJ = (1 - wy) * wx;
             float wH = wy * (1 - wx);
             float wG = wx * wy;
-            int32_t W = dims_original[3];
+            int32_t W = dims_ori[3];
             // todo: 加上exclude_outside系数
             float value = wI * input[x0 + y0 * W] + wJ * input[x1 + y0 * W] +
                           wH * input[x0 + y1 * W] + wG * input[x1 + y1 * W];
             output[0] = value;
             ++output;
           }
-        input += dims_original[2] * dims_original[3];
+        input += dims_ori[2] * dims_ori[3];
       }
     }
   }
@@ -625,21 +625,21 @@ static int32_t Resize_linear_float(float *input, float *output, float *scale,
 }
 
 static int32_t Resize_linear_float3d(float *input, float *output, float *scale,
-                              int32_t *dims_original, int32_t *dims_resized,
-                              int32_t *roi, ctmode ctm) 
+                              uint32_t *dims_ori, uint32_t *dims_new,
+                              uint32_t *roi, ctmode ctm) 
 {
-  for (int32_t n = 0; n < dims_resized[0]; ++n) {
-    for (int32_t c = 0; c < dims_resized[1]; ++c) {
-      for (int32_t h = 0; h < dims_resized[2]; ++h) {
-        float h_original = GetCoordinateFunc(h, ctm, scale[2], dims_original[2],
-                                             dims_resized[2], roi[2], roi[6]);
+  for (int32_t n = 0; n < dims_new[0]; ++n) {
+    for (int32_t c = 0; c < dims_new[1]; ++c) {
+      for (int32_t h = 0; h < dims_new[2]; ++h) {
+        float h_original = GetCoordinateFunc(h, ctm, scale[2], dims_ori[2],
+                                             dims_new[2], roi[2], roi[6]);
 
         float y = h_original;
         int32_t y0, y1;
         if (y < 0)
           y0 = y1 = 0;
-        else if (y > dims_original[2] - 1)
-          y0 = y1 = dims_original[2] - 1;
+        else if (y > dims_ori[2] - 1)
+          y0 = y1 = dims_ori[2] - 1;
         else {
           y0 = (int32_t)h_original;
           y1 = y0 + 1;
@@ -657,7 +657,7 @@ static int32_t Resize_linear_float3d(float *input, float *output, float *scale,
         output[0] = value;
         ++output;
       }
-      input += dims_original[2];
+      input += dims_ori[2];
     }
   }
   return 0;
@@ -675,25 +675,26 @@ static float Bicubic(float x, float a)
 }
 
 static int32_t Resize_cubic_float(float *input, float *output, float *scale,
-                           int32_t *dims_original, int32_t *dims_resized,
-                           int32_t *roi, ctmode ctm, float cubic_coeff_a) 
+                           uint32_t *dims_ori, uint32_t *dims_new,
+                           uint32_t *roi, ctmode ctm, float cubic_coeff_a) 
 {
-  for (int32_t n = 0; n < dims_resized[0]; ++n) {
-    for (int32_t c = 0; c < dims_resized[1]; ++c) {
-      for (int32_t h = 0; h < dims_resized[2]; ++h)
-        for (int32_t w = 0; w < dims_resized[3]; ++w) {
+  for (int32_t n = 0; n < dims_new[0]; ++n) {
+    for (int32_t c = 0; c < dims_new[1]; ++c) {
+      for (int32_t h = 0; h < dims_new[2]; ++h)
+        for (int32_t w = 0; w < dims_new[3]; ++w) {
           float h_original =
-              GetCoordinateFunc(h, ctm, scale[2], dims_original[2],
-                                dims_resized[2], roi[2], roi[6]);
+              GetCoordinateFunc(h, ctm, scale[2], dims_ori[2],
+                                dims_new[2], roi[2], roi[6]);
           float w_original =
-              GetCoordinateFunc(w, ctm, scale[3], dims_original[3],
-                                dims_resized[3], roi[3], roi[7]);
+              GetCoordinateFunc(w, ctm, scale[3], dims_ori[3],
+                                dims_new[3], roi[3], roi[7]);
           int32_t x = (int32_t)floor(w_original),
                   y = (int32_t)floor(h_original);
-          int32_t H = dims_original[2];
-          int32_t W = dims_original[3];
+          int32_t H = dims_ori[2];
+          int32_t W = dims_ori[3];
           // 获取周围4*4图像的坐标
-          int32_t dx[4], dy[4];
+          int32_t dx[4] = {0};
+          int32_t dy[4] = {0};
           for (int32_t i = 0; i < 4; ++i) {
             dx[i] = x + i - 1;
             dy[i] = y + i - 1;
@@ -725,7 +726,7 @@ static int32_t Resize_cubic_float(float *input, float *output, float *scale,
           output[0] = value;
           ++output;
         }
-      input += dims_original[2] * dims_original[3];
+      input += dims_ori[2] * dims_ori[3];
     }
   }
   return 0;
@@ -747,10 +748,12 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     float *input = (float *)tensors[kData]->dptr_;
     float *output = (float *)tensors[op->num_input_]->dptr_;
     float scale[4];
-    int32_t dims_original[4], dims_resized[4], roi[8];
+    uint32_t dims_original[4] = {0};
+    uint32_t dims_resized[4] = {0};
+    uint32_t roi[8];
     // todo: output_dimension = floor(input_dimension * (roi_end - roi_start) *
     // scale) if input "sizes" is not specified. 加上考虑roi的情况
-    for (int32_t i = 0; i < X->shape_.ndim_; ++i) {
+    for (uint32_t i = 0; i < X->shape_.ndim_; ++i) {
       dims_original[i] = X->shape_.dims_[i];
       dims_resized[i] = Y->shape_.dims_[i];
       roi[i] = 0;
@@ -792,8 +795,8 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
         return Resize_cubic_float(input, output, scale, dims_original,
                                   dims_resized, roi, ctm, cubic_coeff_a);
       default:
-        THINKER_LOG_FATAL("Resize: Unsupported ResizeMode!");
-        break;
+        printf("Resize: Unsupported ResizeMode!");
+        return T_ERR_FAIL;
     }
   }
   return 0;

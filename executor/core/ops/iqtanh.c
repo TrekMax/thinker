@@ -28,15 +28,13 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     // Validate tensor count
     CHECK_EQ(num_tensor, (op->num_input_ + op->num_output_));
     
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
-    
 #if THINKER_USE_VENUS || THINKER_USE_ARCS || THINKER_USE_VENUSA
 #if THINKER_PROFILE
     uint64_t start_t = tick_count();
 #endif
 
     // Call hardware-specific tanh implementation
-    ret = iqtanh(tensors[0], tensors[op->num_input_]);
+    THINKER_RET_CHECK(iqtanh(tensors[0], tensors[op->num_input_]), "iqtanh");
 
 #if THINKER_PROFILE
     uint64_t finish_t = tick_count();
@@ -45,7 +43,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
 #endif
 #endif
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #include "core/operator_template.h"

@@ -99,23 +99,23 @@ static int32_t gru_luna_inner(gru_param_t *params, int32_t t, int8_t *p_input,
     int32_t *p_out2 = p_out1 + hidden_size * 3;
 
     // Compute input-to-hidden transformation
-    int32_t ret = API_LIB(split_mat_mul_q7_int32)(p_in, p_iw_weight, p_out1, split_num, 1,
-                                                  input_size, hidden_size * 3, 0);
-    ret |= API_LIB(add_q31_int32)(p_out1, p_ib_bias, p_out1, hidden_size * 3, 0);
-    ret |= API_LIB(scale_q31_int32)(p_out1, 1, p_out1, hidden_size * 3, (ib_q - active_q_in));
+    THINKER_RET_CHECK(API_LIB(split_mat_mul_q7_int32)(p_in, p_iw_weight, p_out1, split_num, 1,
+                                                  input_size, hidden_size * 3, 0), "luna_split_mat_mul_q7_int32");
+    THINKER_RET_CHECK(API_LIB(add_q31_int32)(p_out1, p_ib_bias, p_out1, hidden_size * 3, 0), "luna_add_q31_int32");
+    THINKER_RET_CHECK(API_LIB(scale_q31_int32)(p_out1, 1, p_out1, hidden_size * 3, (ib_q - active_q_in)), "luna_scale_q31_int32");
 
     // Compute hidden-to-hidden transformation
-    ret |= API_LIB(split_mat_mul_q7_int32)(p_h_in, p_hw_weight, p_out2, split_num, 1,
-                                           hidden_size, hidden_size * 3, 0);
-    ret |= API_LIB(add_q31_int32)(p_out2, p_hb_bias, p_out2, hidden_size * 3, 0);
-    ret |= API_LIB(scale_q31_int32)(p_out2, 1, p_out2, hidden_size * 3, (hb_q - active_q_in));
+    THINKER_RET_CHECK(API_LIB(split_mat_mul_q7_int32)(p_h_in, p_hw_weight, p_out2, split_num, 1,
+                                           hidden_size, hidden_size * 3, 0), "luna_split_mat_mul_q7_int32");
+    THINKER_RET_CHECK(API_LIB(add_q31_int32)(p_out2, p_hb_bias, p_out2, hidden_size * 3, 0), "luna_add_q31_int32");
+    THINKER_RET_CHECK(API_LIB(scale_q31_int32)(p_out2, 1, p_out2, hidden_size * 3, (hb_q - active_q_in)), "luna_scale_q31_int32");
 
     // Compute gates and activation
     int32_t *i_n = p_out1 + hidden_size * 2;
     int32_t *h_n = p_out2 + hidden_size * 2;
 
-    ret |= API_LIB(add_q31_int16)((const q31_t *)p_out1, (q31_t *)p_out2, (int16_t *)p_out1,
-                                   hidden_size * 2, 0);
+    THINKER_RET_CHECK(API_LIB(add_q31_int16)((const q31_t *)p_out1, (q31_t *)p_out2, (int16_t *)p_out1,
+                                   hidden_size * 2, 0), "luna_add_q31_int16");
     int16_t *G_r = (int16_t *)p_out1;
     int16_t *G_z = G_r + hidden_size;
     int16_t *G_n = G_z + hidden_size;
@@ -123,25 +123,25 @@ static int32_t gru_luna_inner(gru_param_t *params, int32_t t, int8_t *p_input,
     int8_t *g_z = g_r + hidden_size;
     int8_t *g_n = g_z + hidden_size;
 
-    ret |= API_LIB(sigmoid_int8)(G_r, g_r, hidden_size);
-    ret |= API_LIB(sigmoid_int8)(G_z, g_z, hidden_size);
+    THINKER_RET_CHECK(API_LIB(sigmoid_int8)(G_r, g_r, hidden_size), "luna_sigmoid_int8");
+    THINKER_RET_CHECK(API_LIB(sigmoid_int8)(G_z, g_z, hidden_size), "luna_sigmoid_int8");
 
-    ret |= API_LIB(scale_q7_int32)(g_r, 1, (int32_t *)G_r, hidden_size, 0);
-    ret |= API_LIB(mul_q31_int32)((int32_t *)G_r, h_n, (int32_t *)G_r, hidden_size, active_q_out);
-    ret |= API_LIB(add_q31_int16)(i_n, (int32_t *)G_r, G_n, hidden_size, 0);
-    ret |= API_LIB(tanh_int8)(G_n, g_n, hidden_size);
+    THINKER_RET_CHECK(API_LIB(scale_q7_int32)(g_r, 1, (int32_t *)G_r, hidden_size, 0), "luna_scale_q7_int32");
+    THINKER_RET_CHECK(API_LIB(mul_q31_int32)((int32_t *)G_r, h_n, (int32_t *)G_r, hidden_size, active_q_out), "luna_mul_q31_int32");
+    THINKER_RET_CHECK(API_LIB(add_q31_int16)(i_n, (int32_t *)G_r, G_n, hidden_size, 0), "luna_add_q31_int16");
+    THINKER_RET_CHECK(API_LIB(tanh_int8)(G_n, g_n, hidden_size), "luna_tanh_int8");
 
-    ret |= API_LIB(scale_q7_int8)(p_h_in, 1, p_h_in, hidden_size, 1);
-    ret |= API_LIB(mul_q7_int16)(g_z, p_h_in, G_r, hidden_size, 0);
-    ret |= API_LIB(scale_q7_int16)(g_z, -1, G_z, hidden_size, 0);
-    ret |= API_LIB(offset_q15_int16)(G_z, 128, G_z, hidden_size, 0);
-    ret |= API_LIB(scale_q7_int16)(g_n, 1, G_n, hidden_size, 0);
-    ret |= API_LIB(mul_q15_int16)(G_z, G_n, G_n, hidden_size, 0);
-    ret |= API_LIB(add_q15_int8)(G_r, G_n, p_h_in, hidden_size, (active_q_out + active_q_out - o_q));
+    THINKER_RET_CHECK(API_LIB(scale_q7_int8)(p_h_in, 1, p_h_in, hidden_size, 1), "luna_scale_q7_int8");
+    THINKER_RET_CHECK(API_LIB(mul_q7_int16)(g_z, p_h_in, G_r, hidden_size, 0), "luna_mul_q7_int16");
+    THINKER_RET_CHECK(API_LIB(scale_q7_int16)(g_z, -1, G_z, hidden_size, 0), "luna_scale_q7_int16");
+    THINKER_RET_CHECK(API_LIB(offset_q15_int16)(G_z, 128, G_z, hidden_size, 0), "luna_offset_q15_int16");
+    THINKER_RET_CHECK(API_LIB(scale_q7_int16)(g_n, 1, G_n, hidden_size, 0), "luna_scale_q7_int16");
+    THINKER_RET_CHECK(API_LIB(mul_q15_int16)(G_z, G_n, G_n, hidden_size, 0), "luna_mul_q15_int16");
+    THINKER_RET_CHECK(API_LIB(add_q15_int8)(G_r, G_n, p_h_in, hidden_size, (active_q_out + active_q_out - o_q)), "luna_add_q15_int8");
 
-    ret |= API_LIB(memcpy)(p_out, p_h_in, hidden_size);
+    THINKER_RET_CHECK(API_LIB(memcpy)(p_out, p_h_in, hidden_size), "luna_memcpy");
 
-    return ret;
+    return T_SUCCESS;
 }
 
 /**
@@ -209,16 +209,16 @@ int32_t gruint_luna(tTensor *input, tTensor *history_h, tTensor *i2h_w,
         for (int32_t b = 0; b < batch_size; b++) {
             memset(gru_param.p_h_in, 0, gru_param.hidden_size * hidden_o->byte_);
             for (int32_t t = 0; t < seq_len; t++) {
-                gru_luna_inner(&gru_param, t, p_input + step_size * t + b * step_size * seq_len,
-                              p_out + out_step_size * t + b * out_step_size * seq_len, p_tmp, tmp_size);
+                THINKER_RET_CHECK(gru_luna_inner(&gru_param, t, p_input + step_size * t + b * step_size * seq_len,
+                              p_out + out_step_size * t + b * out_step_size * seq_len, p_tmp, tmp_size), "gru_luna_inner");
             }
         }
     } else {
         for (int32_t b = 0; b < batch_size; b++) {
             memset(gru_param.p_h_in, 0, gru_param.hidden_size * hidden_o->byte_);
             for (int32_t t = seq_len - 1; t >= 0; t--) {
-                gru_luna_inner(&gru_param, seq_len - t - 1, p_input + step_size * t + b * step_size * seq_len,
-                              p_out + out_step_size * t + b * out_step_size * seq_len, p_tmp, tmp_size);
+                THINKER_RET_CHECK(gru_luna_inner(&gru_param, seq_len - t - 1, p_input + step_size * t + b * step_size * seq_len,
+                              p_out + out_step_size * t + b * out_step_size * seq_len, p_tmp, tmp_size), "gru_luna_inner");
             }
         }
     }

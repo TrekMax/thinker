@@ -24,8 +24,6 @@
  * @return Execution status
  */
 tStatus relux_luna(tTensor *X, tTensor *Y, ReluxAttrs *attrs) {
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
-
     // Check if input and output are in PSRAM
     if (X->mem_.type_ != 2 || Y->mem_.type_ != 2) {
         return T_ERR_NO_IMPLEMENTED;
@@ -44,19 +42,19 @@ tStatus relux_luna(tTensor *X, tTensor *Y, ReluxAttrs *attrs) {
     // Execute ReLUX operation based on input data type
     switch (X->dtype_) {
         case Int8:
-            ret = API_LIB(relux_i8o8)((int8_t *)X->dptr_, threshold, (int8_t *)Y->dptr_, size, shift);
+            THINKER_RET_CHECK(API_LIB(relux_i8o8)((int8_t *)X->dptr_, threshold, (int8_t *)Y->dptr_, size, shift), "luna_relux_i8o8");
             break;
         case Int16:
-            ret = API_LIB(relux_i16o8)((int16_t *)X->dptr_, threshold, (int8_t *)Y->dptr_, size, shift);
+            THINKER_RET_CHECK(API_LIB(relux_i16o8)((int16_t *)X->dptr_, threshold, (int8_t *)Y->dptr_, size, shift), "luna_relux_i16o8");
             break;
         case Int32:
-            ret = API_LIB(relux_i32o8)((int32_t *)X->dptr_, threshold, (int8_t *)Y->dptr_, size, shift);
+            THINKER_RET_CHECK(API_LIB(relux_i32o8)((int32_t *)X->dptr_, threshold, (int8_t *)Y->dptr_, size, shift), "luna_relux_i32o8");
             break;
         default:
             return T_ERR_INVALID_DATATYPE;
     }
 
-    return ret ? T_SUCCESS : T_ERR_FAIL;
+    return T_SUCCESS;
 }
 
 #endif

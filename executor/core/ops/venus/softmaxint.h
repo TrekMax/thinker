@@ -65,8 +65,8 @@ int32_t softmaxint_luna(tTensor *data, tTensor *out, tTensor *Workspace, Softmax
             }
 
             // Scale input to Q25
-            API_LIB(scale_q7_int32)(src_tmp, 1, tmp1, data_size, 0);
-            API_LIB(scale_q31_int32)(tmp1, (1 << (SOFTMAX_Q_IN - x_scale)), tmp1, data_size, 0);
+            THINKER_RET_CHECK(API_LIB(scale_q7_int32)(src_tmp, 1, tmp1, data_size, 0), "luna_scale_q7_int32");
+            THINKER_RET_CHECK(API_LIB(scale_q31_int32)(tmp1, (1 << (SOFTMAX_Q_IN - x_scale)), tmp1, data_size, 0), "luna_scale_q31_int32");
 
             // Compute Softmax
             for (int32_t l = 0; l < leading; ++l) {
@@ -95,14 +95,14 @@ int32_t softmaxint_luna(tTensor *data, tTensor *out, tTensor *Workspace, Softmax
                 }
 
                 // Scale input to Q25
-                API_LIB(scale_q7_int32)(lsrc, 1, tmp1, stride, 0);
-                API_LIB(scale_q31_int32)(tmp1, (1 << (SOFTMAX_Q_IN - x_scale)), tmp2, stride, 0);
+                THINKER_RET_CHECK(API_LIB(scale_q7_int32)(lsrc, 1, tmp1, stride, 0), "luna_scale_q7_int32");
+                THINKER_RET_CHECK(API_LIB(scale_q31_int32)(tmp1, (1 << (SOFTMAX_Q_IN - x_scale)), tmp2, stride, 0), "luna_scale_q31_int32");
 
                 // Compute Softmax
                 vec_softmax32x32(tmp1, tmp2, stride);
 
                 // Scale output to Q15
-                API_LIB(scale_q31_int8)(tmp1, 1, ldst, stride, (SOFTMAX_Q_OUT - y_scale));
+                THINKER_RET_CHECK(API_LIB(scale_q31_int8)(tmp1, 1, ldst, stride, (SOFTMAX_Q_OUT - y_scale)), "luna_scale_q31_int8");
 
                 if (out->mem_.type_ != 2) {
                     memcpy(dst + l * stride, ldst, stride);

@@ -98,7 +98,6 @@ static int32_t luna_ceil(int32_t x, int32_t shift) {
  * @return Status code indicating success or failure
  */
 int32_t linearint_luna(tTensor *input, tTensor *weight, tTensor *bias, LinearIntAttrs *attrs, tTensor *workspace, tTensor *output) {
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
     tShape new_shape;
     
     // Handle different input dimensions
@@ -145,12 +144,12 @@ int32_t linearint_luna(tTensor *input, tTensor *weight, tTensor *bias, LinearInt
     int32_t shift = q_i + q_w - q_o;
     
     if ((shift < 0) & (Int8 == output->dtype_)) {
-        return ret;
+        return T_ERR_INVALID_DATATYPE;
     }
 
     // Temporary buffer allocation
 
-    int32_t input_size      = getShapeSize(&(input->shape_));
+    int32_t input_size = getShapeSize(&(input->shape_));
     int8_t *p_tmp = (NULL != workspace) ? (int8_t *)workspace->dptr_ : NULL;
     
     // Handle PSRAM input case
@@ -165,13 +164,13 @@ int32_t linearint_luna(tTensor *input, tTensor *weight, tTensor *bias, LinearInt
             transpose2dInt8to32(src, (int32_t *)p_tmp, M, N);
         else
             return T_ERR_NO_SUPPORT_OP;
-        ret = T_SUCCESS;
-    } else {
+    } 
+    else {
         if ((weight->dtype_ == Int8) || (weight->dtype_ == Int4))
-            ret = API_LIB(split_mat_trans_i8o8)(src, p_tmp, M, N);
+            THINKER_RET_CHECK(API_LIB(split_mat_trans_i8o8)(src, p_tmp, M, N), "luna_split_mat_trans_i8o8");
         else {
-            ret = API_LIB(scale_i8i8o32)(src, 1, (int32_t *)p_tmp, M * N, 0);
-            ret = API_LIB(split_mat_trans_i32o32)((int32_t *)p_tmp, (int32_t *)p_tmp, M, N);
+            THINKER_RET_CHECK(API_LIB(scale_i8i8o32)(src, 1, (int32_t *)p_tmp, M * N, 0), "luna_scale_i8i8o32");
+            THINKER_RET_CHECK(API_LIB(split_mat_trans_i32o32)((int32_t *)p_tmp, (int32_t *)p_tmp, M, N), "luna_split_mat_trans_i32o32");
         }
     }
 
@@ -184,48 +183,55 @@ int32_t linearint_luna(tTensor *input, tTensor *weight, tTensor *bias, LinearInt
 
     // Execute different matrix multiplication paths based on data types
     if ((Int4 == weight->dtype_) & (Int8 == output->dtype_)) {
-        ret |= API_LIB(split_mat_mul_bias_i4i8i32o8)(p_weight, p_tmp, p_bias, dst, L, ALIGN2(N), M, shift);
+        THINKER_RET_CHECK(API_LIB(split_mat_mul_bias_i4i8i32o8)(p_weight, p_tmp, p_bias, dst, L, ALIGN2(N), M, shift), "luna_split_mat_mul_bias_i4i8i32o8");
         if (ou_is_psram) {
             transpose2dInt8(dst, (int8_t *)output->dptr_, L, M);
 #if !(defined(WIN32) || defined(linux))
             HAL_FlushDCache_by_Addr((uint32_t *)(output->dptr_), M*L);
 #endif
-        } else {
-            ret |= API_LIB(split_mat_trans_i8o8)(dst, (int8_t *)output->dptr_, L, M);
+        } 
+        else {
+            THINKER_RET_CHECK(API_LIB(split_mat_trans_i8o8)(dst, (int8_t *)output->dptr_, L, M), "luna_split_mat_trans_i8o8");
         }
-    } else if ((Int8 == weight->dtype_) & (Int8 == output->dtype_)) {
-        ret |= API_LIB(split_mat_mul_bias_i8i8i32o8)(p_weight, p_tmp, p_bias, dst, L, N, M, shift);
+    } 
+    else if ((Int8 == weight->dtype_) & (Int8 == output->dtype_)) {
+        THINKER_RET_CHECK(API_LIB(split_mat_mul_bias_i8i8i32o8)(p_weight, p_tmp, p_bias, dst, L, N, M, shift), "luna_split_mat_mul_bias_i8i8i32o8");
         if (ou_is_psram) {
             transpose2dInt8(dst, (int8_t *)output->dptr_, L, M);
 #if !(defined(WIN32) || defined(linux))
             HAL_FlushDCache_by_Addr((uint32_t *)(output->dptr_), M*L);
 #endif
-        } else {
-            ret |= API_LIB(split_mat_trans_i8o8)(dst, (int8_t *)output->dptr_, L, M);
+        } 
+        else {
+            THINKER_RET_CHECK(API_LIB(split_mat_trans_i8o8)(dst, (int8_t *)output->dptr_, L, M), "luna_split_mat_trans_i8o8");
         }
-    } else if ((Int8 == weight->dtype_) & (Int32 == output->dtype_)) {
+    } 
+    else if ((Int8 == weight->dtype_) & (Int32 == output->dtype_)) {
         if(shift < 0) {
             int32_t scale_out = 1UL<<(-shift);
-            ret = API_LIB(split_mat_mul_bias_i8i8i32o32)(p_weight, p_tmp, p_bias, (int32_t *)dst, L, N, M, 0);
-            ret = API_LIB(scale_i32i32o32)((int32_t *)dst, scale_out, (int32_t *)dst, M * L, 0);
-        } else {
-            ret = API_LIB(split_mat_mul_bias_i8i8i32o32)(p_weight, p_tmp, p_bias, (int32_t *)dst, L, N, M, shift);
+            THINKER_RET_CHECK(API_LIB(split_mat_mul_bias_i8i8i32o32)(p_weight, p_tmp, p_bias, (int32_t *)dst, L, N, M, 0), "luna_split_mat_mul_bias_i8i8i32o32");
+            THINKER_RET_CHECK(API_LIB(scale_i32i32o32)((int32_t *)dst, scale_out, (int32_t *)dst, M * L, 0), "luna_scale_i32i32o32");
+        } 
+        else {
+            THINKER_RET_CHECK(API_LIB(split_mat_mul_bias_i8i8i32o32)(p_weight, p_tmp, p_bias, (int32_t *)dst, L, N, M, shift), "luna_split_mat_mul_bias_i8i8i32o32");
         }
         if (ou_is_psram) {
             transpose2dInt32((int32_t *)dst, (int32_t *)output->dptr_, L, M);
 #if !(defined(WIN32) || defined(linux))
             HAL_FlushDCache_by_Addr((uint32_t *)(output->dptr_), M*L*4);
 #endif
-        } else {
-            ret |= API_LIB(split_mat_trans_i32o32)((int32_t *)dst, (int32_t *)output->dptr_, L, M);
+        } 
+        else {
+            THINKER_RET_CHECK(API_LIB(split_mat_trans_i32o32)((int32_t *)dst, (int32_t *)output->dptr_, L, M), "luna_split_mat_trans_i32o32");
         }
     } else if ((Int32 == weight->dtype_) & (Int32 == output->dtype_)) {
         if(shift < 0) {
             int32_t scale_out = 1UL<<(-shift);
-            ret = API_LIB(split_mat_mul_bias_i32i32i32o32)((int32_t *)p_weight, (int32_t *)p_tmp, p_bias, (int32_t *)dst, L, N, M, 0);
-            ret = API_LIB(scale_i32i32o32)((int32_t *)dst, scale_out, (int32_t *)dst, M * L, 0);
-        } else {
-            ret = API_LIB(split_mat_mul_bias_i32i32i32o32)((int32_t *)p_weight, (int32_t *)p_tmp, p_bias, (int32_t *)dst, L, N, M, shift);
+            THINKER_RET_CHECK(API_LIB(split_mat_mul_bias_i32i32i32o32)((int32_t *)p_weight, (int32_t *)p_tmp, p_bias, (int32_t *)dst, L, N, M, 0), "luna_split_mat_mul_bias_i32i32i32o32");
+            THINKER_RET_CHECK(API_LIB(scale_i32i32o32)((int32_t *)dst, scale_out, (int32_t *)dst, M * L, 0), "luna_scale_i32i32o32");
+        } 
+        else {
+            THINKER_RET_CHECK(API_LIB(split_mat_mul_bias_i32i32i32o32)((int32_t *)p_weight, (int32_t *)p_tmp, p_bias, (int32_t *)dst, L, N, M, shift), "luna_split_mat_mul_bias_i32i32i32o32");
         }
         if (ou_is_psram) {
             transpose2dInt32((int32_t *)dst, (int32_t *)output->dptr_, L, M);
@@ -233,13 +239,13 @@ int32_t linearint_luna(tTensor *input, tTensor *weight, tTensor *bias, LinearInt
             HAL_FlushDCache_by_Addr((uint32_t *)(output->dptr_), M*L*4);
 #endif
         } else {
-            ret |= API_LIB(split_mat_trans_i32o32)((int32_t *)dst, (int32_t *)output->dptr_, L, M);
+            THINKER_RET_CHECK(API_LIB(split_mat_trans_i32o32)((int32_t *)dst, (int32_t *)output->dptr_, L, M), "luna_split_mat_trans_i32o32");
         }
     } else {
         return T_ERR_INVALID_DATATYPE;
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif

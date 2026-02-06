@@ -22,7 +22,6 @@
  * @return int32_t Operation status
  */
 int32_t iqadd_luna(tTensor *X1, tTensor *X2, tTensor *Temp, tTensor *Y) {
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
     int32_t x1_q = (int32_t)X1->scale_;
     int32_t x2_q = (int32_t)X2->scale_;
     int32_t y_q = (int32_t)Y->scale_;
@@ -57,7 +56,7 @@ int32_t iqadd_luna(tTensor *X1, tTensor *X2, tTensor *Temp, tTensor *Y) {
                 // Scale input if needed
                 if (x1_q != y_q) {
                     int8_t *out_temp = y_is_psram ? (int8_t *)Temp->dptr_ : (int8_t *)dst;
-                    ret = API_LIB(scale_q7_int8)((const q7_t *)src1, 1, out_temp, size, shift1);
+                    THINKER_RET_CHECK(API_LIB(scale_q7_int8)((const q7_t *)src1, 1, out_temp, size, shift1), "luna_scale_q7_int8");
                     src1 = (int8_t *)out_temp;
                 }
 
@@ -72,13 +71,13 @@ int32_t iqadd_luna(tTensor *X1, tTensor *X2, tTensor *Temp, tTensor *Y) {
                 if (x2_q != y_q) {
                     int8_t *out_temp = y_is_psram ? ((int8_t *)Temp->dptr_ + ((x1_is_psram || x1_q != y_q) * size)) : 
                                                    ((x1_is_psram || x1_q != y_q) ? (int8_t *)Temp->dptr_ : dst);
-                    ret = API_LIB(scale_q7_int8)((const q7_t *)src2, 1, out_temp, size, shift2);
+                    THINKER_RET_CHECK(API_LIB(scale_q7_int8)((const q7_t *)src2, 1, out_temp, size, shift2), "luna_scale_q7_int8");
                     src2 = (int8_t *)out_temp;
                 }
 
                 // Perform actual addition
                 dst = y_is_psram ? (int8_t *)Temp->dptr_ : dst;
-                ret = API_LIB(add_q7_int8)((const q7_t *)src1, (q7_t *)src2, (int8_t *)dst, size, 0);
+                THINKER_RET_CHECK(API_LIB(add_q7_int8)((const q7_t *)src1, (q7_t *)src2, (int8_t *)dst, size, 0), "luna_add_q7_int8");
 
                 // Copy result to output if needed
                 if (y_is_psram) {
@@ -86,21 +85,20 @@ int32_t iqadd_luna(tTensor *X1, tTensor *X2, tTensor *Temp, tTensor *Y) {
                 }
                 break;
             default:
-                ret = T_ERR_INVALID_DATATYPE;
-                break;
+                return T_ERR_INVALID_DATATYPE;
         }
     }
     // Handle scalar float addition case
     else if ((X2->dtype_ == Float32) && (X2->shape_.ndim_ == 0)) {
         int32_t shift = x1_q - y_q;
-        int8_t src2_tmp = ((float *)src2)[0] * (1 << x1_q);
-        ret = API_LIB(offset_q7_int8)((const q7_t *)src1, src2_tmp, dst, size, shift);
+        int8_t src2_tmp = floor(((float *)src2)[0] * (1 << x1_q) + 0.5);
+        THINKER_RET_CHECK(API_LIB(offset_q7_int8)((const q7_t *)src1, src2_tmp, dst, size, shift), "luna_offset_q7_int8");
     }
     else {
-        ret = T_ERR_INVALID_DATATYPE;
+        return T_ERR_INVALID_DATATYPE;
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif

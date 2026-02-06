@@ -31,7 +31,6 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     
     // Get binary operation attributes
     iqBinaryAttrs *attrs = (iqBinaryAttrs *)((int8_t *)op + op->attr_offset_);
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
     
     // Get temporary workspace tensor
     tTensor *temp = tensors[op->num_input_ + op->num_output_];
@@ -42,7 +41,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
 #endif
 
     // Call hardware-specific subtraction implementation
-    ret = iqsub_luna(tensors[0], tensors[1], temp, tensors[op->num_input_]);
+    THINKER_RET_CHECK(iqsub_luna(tensors[0], tensors[1], temp, tensors[op->num_input_]), "issub_luna");
 
 #if THINKER_PROFILE
     uint64_t finish_t = tick_count();
@@ -51,7 +50,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
 #endif
 #endif
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #include "core/operator_template.h"

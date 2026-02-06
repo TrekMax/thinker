@@ -30,7 +30,6 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     CHECK_GE(num_tensor, (op->num_input_ + op->num_output_));  // Validate tensor count
 
     SoftmaxIntAttrs *attr = (SoftmaxIntAttrs *)((int8_t *)op + op->attr_offset_);
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
 
     tTensor *workspace = NULL;
     if (num_tensor > op->num_input_ + op->num_output_) {
@@ -41,7 +40,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
 #if THINKER_PROFILE
     uint64_t start_t = tick_count();  // Start profiling
 #endif
-    ret = softmaxint_luna(tensors[0], tensors[op->num_input_], workspace, attr);
+    THINKER_RET_CHECK(softmaxint_luna(tensors[0], tensors[op->num_input_], workspace, attr), "softmaxint_luna");
 #if THINKER_PROFILE
     uint64_t finish_t = tick_count();
     uint32_t total_t = (uint32_t)(finish_t - start_t);
@@ -49,7 +48,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
 #endif
 #endif
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #include "core/operator_template.h"

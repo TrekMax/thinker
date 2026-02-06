@@ -20,9 +20,7 @@
  * @param Y Output tensor
  * @return int32_t Operation status
  */
-int32_t iqtanh(tTensor *X, tTensor *Y) 
-{
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
+int32_t iqtanh(tTensor *X, tTensor *Y) {
     const int32_t Q_INPUT = 27;
     const int32_t Q_OUTPUT = 7;
     int32_t x_q = X->scale_;
@@ -33,11 +31,9 @@ int32_t iqtanh(tTensor *X, tTensor *Y)
     uint32_t size = getTensorSize(X);
 
     if (Q_INPUT != x_q) {
-        ret = API_LIB(scale_i32i32o32)(src, 1, src, size, x_q - Q_INPUT);
+        THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(src, 1, src, size, x_q - Q_INPUT), "luna_scale_i32i32o32");
     }
-    ret = API_LIB(tanh_i32o8)(src, dst, size);
-
-    return ret;
+    return API_LIB(tanh_i32o8)(src, dst, size);
 }
 
 #endif

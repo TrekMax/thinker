@@ -172,6 +172,6 @@ int32_t tile_luna(tTensor *X, tTensor *xRepeat, tTensor *Y)
         tile_float(input, output, ndim, inShape, outShape, repeat, size);
     }
 
-    return 0;
+    return T_SUCCESS;
 }
 #endif

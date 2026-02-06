@@ -24,8 +24,6 @@
  * @return int32_t Operation status
  */
 int32_t iqvar_luna(tTensor *X, tTensor *Y, tTensor *temp, iqvarAttrs *attrs) {
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
-
     // Quantization scales
     int32_t x_q = (int32_t)X->scale_;
     int32_t y_q = (int32_t)Y->scale_;
@@ -58,7 +56,7 @@ int32_t iqvar_luna(tTensor *X, tTensor *Y, tTensor *temp, iqvarAttrs *attrs) {
                 X->shape_.dims_[n_dim - 2],
                 X->shape_.dims_[n_dim - 1]
             };
-            ret = API_LIB(trans_axis_i8o8)(src, p_tmp, in_shape, axis, 3);
+            THINKER_RET_CHECK(API_LIB(trans_axis_i8o8)(src, p_tmp, in_shape, axis, 3), "luna_trans_axis_i8o8");
             src = p_tmp;
         }
 
@@ -70,9 +68,9 @@ int32_t iqvar_luna(tTensor *X, tTensor *Y, tTensor *temp, iqvarAttrs *attrs) {
             int8_t *p_dst_once = dst + i;
 
             // Calculate sum of squares
-            ret = API_LIB(vector_sum_i32o32)((const int32_t *)p_tmp2, sum_x2, F, 0);
+            THINKER_RET_CHECK(API_LIB(vector_sum_i32o32)((const int32_t *)p_tmp2, sum_x2, F, 0), "luna_sum_i32o32");
             // Calculate sum of elements
-            ret = API_LIB(vector_sum_i8o32)(p_src_once, sum_x, F, 0);
+            THINKER_RET_CHECK(API_LIB(vector_sum_i8o32)(p_src_once, sum_x, F, 0), "luna_vector_sum_i8o32");
 
             int32_t sum_x_val = *sum_x;
             int32_t sum_x2_val = *sum_x2;
@@ -89,7 +87,7 @@ int32_t iqvar_luna(tTensor *X, tTensor *Y, tTensor *temp, iqvarAttrs *attrs) {
         }
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif  // _VAR_LUNA_H_

@@ -47,7 +47,7 @@ static int32_t calc_relu_luna(int32_t X_dtype, int32_t Y_dtype, const void *src,
             }
         }
     }
-    return -1;
+    return T_ERR_INVALID_DATATYPE;
 }
 
 /**
@@ -94,11 +94,12 @@ tStatus relu_luna(tTensor *X, tTensor *Y, tTensor *Workspace) {
             }
 
             memcpy(tmp_buf, p_in, split_size);
-            calc_relu_luna(Int8, Int8, tmp_buf, tmp_buf, split_size, shift);
+            THINKER_RET_CHECK(calc_relu_luna(Int8, Int8, tmp_buf, tmp_buf, split_size, shift), "calc_relu_luna");
             memcpy(p_out, tmp_buf, split_size);
         }
-    } else {
-        calc_relu_luna(X->dtype_, Y->dtype_, src, dst, size, shift);
+    } 
+    else {
+        return calc_relu_luna(X->dtype_, Y->dtype_, src, dst, size, shift);
     }
 
     return T_SUCCESS;

@@ -4,7 +4,6 @@
 int32_t ScalarFunc(double *scalars, const ScalarOpType *op_type,
                    const int32_t *io_ids, int input_num)
 {
-  int32_t ret = 0;
   switch (*op_type)
   {
   case ADD:
@@ -38,5 +37,5 @@ int32_t ScalarFunc(double *scalars, const ScalarOpType *op_type,
     assert(0);
     break;
   }
-  return ret;
+  return T_SUCCESS;
 }

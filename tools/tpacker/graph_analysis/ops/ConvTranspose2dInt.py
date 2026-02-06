@@ -159,7 +159,7 @@ class ConvTranspose2dInt(Operator, ConvLayout):
         x_c = calc_expr(str(X.shape[1]), dynamic_shape) if is_sympy(X.shape[1]) else X.shape[1]
         x_h = calc_expr(str(X.shape[2]), dynamic_shape) if is_sympy(X.shape[2]) else X.shape[2]
         x_w = calc_expr(str(X.shape[3]), dynamic_shape) if is_sympy(X.shape[3]) else X.shape[3]
-        assert x_c == W.shape[0] * group, "Channel mismatch"
+        assert not (x_c == group and group != 1), "Do not support depthwsie Convtranspose"
         assert kernels[-1] >= W.shape[-1] and kernels[-2] >= W.shape[-2], \
             "kernel_size:() must same with input of weight:()".format((kernels[-1], kernels[-2]), (W.shape[-1], W.shape[-2]))
 

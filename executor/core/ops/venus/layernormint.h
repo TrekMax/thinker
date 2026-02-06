@@ -278,8 +278,6 @@ static const int16_t calc_sqrt_reciprocal(const int64_t data, int32_t q_x, int32
  */
 int32_t layernormalint_venus(const tTensor *X, const tTensor *W, const tTensor *Bias, tTensor *Y, tTensor *workspace, LayerNormIntAttrs *attrs) 
 {
-  int32_t ret = T_ERR_FAIL;
-
   int32_t n_dims = X->shape_.ndim_;
   int32_t size = getTensorSize(W);
   int32_t leading = 1;
@@ -324,9 +322,9 @@ int32_t layernormalint_venus(const tTensor *X, const tTensor *W, const tTensor *
 	{
 		int8_t *p_src_once = p_src + i * T;
 		int8_t *p_dst_once = p_dst + i * T;
-		API_LIB(vector_sum_q7_int32)(p_src_once, sum_x, T, 0);
-		API_LIB(mul_q7_int32)(p_src_once, p_src_once, p_src2, T, 0);
-		API_LIB(vector_sum_q31_int32)(p_src2, sum_x2, T, 0);
+		THINKER_RET_CHECK(API_LIB(vector_sum_q7_int32)(p_src_once, sum_x, T, 0), "luna_vector_sum_q7_int32");
+		THINKER_RET_CHECK(API_LIB(mul_q7_int32)(p_src_once, p_src_once, p_src2, T, 0), "luna_mul_q7_int32");
+		THINKER_RET_CHECK(API_LIB(vector_sum_q31_int32)(p_src2, sum_x2, T, 0), "luna_vector_sum_q31_int32");
 
 		int32_t sum_x_val = *sum_x;
 		int32_t sum_x2_val = *sum_x2;
@@ -334,14 +332,14 @@ int32_t layernormalint_venus(const tTensor *X, const tTensor *W, const tTensor *
 		denominator = denominator + q_eps;
 		int32_t label_shift = 0;
 		denominator = calc_sqrt_reciprocal((const int64_t)denominator, q_x, &label_shift);
-		API_LIB(scale_q7_int32)(p_src_once, 1, p_numerator, T, 0);
-		API_LIB(scale_q31_int32)(p_numerator, T, p_numerator, T, 0);
-		API_LIB(offset_q31_int32)(p_numerator, (0 - sum_x_val), p_numerator, T, 0);
-		API_LIB(scale_q31_int16)(p_numerator, denominator, (int16_t *)p_y1, T, label_shift);
-		API_LIB(mul_q15_int32)(p_y1, (int16_t *)p_gamma, p_y2, T, 0);
-		API_LIB(add_q31_int8)(p_y2, p_beta, p_dst_once, T, shift);
+		THINKER_RET_CHECK(API_LIB(scale_q7_int32)(p_src_once, 1, p_numerator, T, 0), "luna_scale_q7_int32");
+		THINKER_RET_CHECK(API_LIB(scale_q31_int32)(p_numerator, T, p_numerator, T, 0), "luna_scale_q31_int32");
+		THINKER_RET_CHECK(API_LIB(offset_q31_int32)(p_numerator, (0 - sum_x_val), p_numerator, T, 0), "luna_offset_q31_int32");
+		THINKER_RET_CHECK(API_LIB(scale_q31_int16)(p_numerator, denominator, (int16_t *)p_y1, T, label_shift), "luna_scale_q31_int16");
+		THINKER_RET_CHECK(API_LIB(mul_q15_int32)(p_y1, (int16_t *)p_gamma, p_y2, T, 0), "luna_mul_q15_int32");
+		THINKER_RET_CHECK(API_LIB(add_q31_int8)(p_y2, p_beta, p_dst_once, T, shift), "luna_add_q31_int8");
 	}
 
-	return 0;
+	return T_SUCCESS;
 }
 #endif

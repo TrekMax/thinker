@@ -20,8 +20,6 @@
  * @return int32_t Operation status
  */
 int32_t bmmint_luna(tTensor *lhs, tTensor *rhs, tTensor *out, tTensor *workspace) {
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
-
     // Check input and output data types
     if (lhs->dtype_ != Int8 && lhs->dtype_ != Int16 && lhs->dtype_ != Int32) {
         return T_ERR_INVALID_DATATYPE;
@@ -61,21 +59,21 @@ int32_t bmmint_luna(tTensor *lhs, tTensor *rhs, tTensor *out, tTensor *workspace
                 int8_t *tsrc1 = (int8_t *)lhs->dptr_ + i * src1_offset;
                 int8_t *tsrc2 = (int8_t *)rhs->dptr_ + i * src2_offset;
                 int8_t *tdst = (int8_t *)out->dptr_ + i * dst_offset;
-                ret = API_LIB(split_mat_mul_i8i8o8)(tsrc1, tsrc2, tdst, M, N, L, shift);
+                THINKER_RET_CHECK(API_LIB(split_mat_mul_i8i8o8)(tsrc1, tsrc2, tdst, M, N, L, shift), "luna_split_mat_mul_i8i8o8");
             }
         } else if (out->dtype_ == Int16) {
             for (int32_t i = 0; i < batch; ++i) {
                 int8_t *tsrc1 = (int8_t *)lhs->dptr_ + i * src1_offset;
                 int8_t *tsrc2 = (int8_t *)rhs->dptr_ + i * src2_offset;
                 int16_t *tdst = (int16_t *)out->dptr_ + i * dst_offset;
-                ret = API_LIB(split_mat_mul_i8i8o16)(tsrc1, tsrc2, tdst, M, N, L, shift);
+                THINKER_RET_CHECK(API_LIB(split_mat_mul_i8i8o16)(tsrc1, tsrc2, tdst, M, N, L, shift), "luna_split_mat_mul_i8i8o16");
             }
         } else { // out->dtype_ == Int32
             for (int32_t i = 0; i < batch; ++i) {
                 int8_t *tsrc1 = (int8_t *)lhs->dptr_ + i * src1_offset;
                 int8_t *tsrc2 = (int8_t *)rhs->dptr_ + i * src2_offset;
                 int32_t *tdst = (int32_t *)out->dptr_ + i * dst_offset;
-                ret = API_LIB(split_mat_mul_i8i8o32)(tsrc1, tsrc2, tdst, M, N, L, shift);
+                THINKER_RET_CHECK(API_LIB(split_mat_mul_i8i8o32)(tsrc1, tsrc2, tdst, M, N, L, shift), "luna_split_mat_mul_i8i8o32");
             }
         }
     } else if (lhs->dtype_ == Int16) {
@@ -84,21 +82,21 @@ int32_t bmmint_luna(tTensor *lhs, tTensor *rhs, tTensor *out, tTensor *workspace
                 int16_t *tsrc1 = (int16_t *)lhs->dptr_ + i * src1_offset;
                 int16_t *tsrc2 = (int16_t *)rhs->dptr_ + i * src2_offset;
                 int8_t *tdst = (int8_t *)out->dptr_ + i * dst_offset;
-                ret = API_LIB(split_mat_mul_i16i16o8)(tsrc1, tsrc2, tdst, M, N, L, shift);
+                THINKER_RET_CHECK(API_LIB(split_mat_mul_i16i16o8)(tsrc1, tsrc2, tdst, M, N, L, shift), "luna_split_mat_mul_i16i16o8");
             }
         } else if (out->dtype_ == Int16) {
             for (int32_t i = 0; i < batch; ++i) {
                 int16_t *tsrc1 = (int16_t *)lhs->dptr_ + i * src1_offset;
                 int16_t *tsrc2 = (int16_t *)rhs->dptr_ + i * src2_offset;
                 int16_t *tdst = (int16_t *)out->dptr_ + i * dst_offset;
-                ret = API_LIB(split_mat_mul_i16i16o16)(tsrc1, tsrc2, tdst, M, N, L, shift);
+                THINKER_RET_CHECK(API_LIB(split_mat_mul_i16i16o16)(tsrc1, tsrc2, tdst, M, N, L, shift), "luna_split_mat_mul_i16i16o16");
             }
         } else { // out->dtype_ == Int32
             for (int32_t i = 0; i < batch; ++i) {
                 int16_t *tsrc1 = (int16_t *)lhs->dptr_ + i * src1_offset;
                 int16_t *tsrc2 = (int16_t *)rhs->dptr_ + i * src2_offset;
                 int32_t *tdst = (int32_t *)out->dptr_ + i * dst_offset;
-                ret = API_LIB(split_mat_mul_i16i16o32)(tsrc1, tsrc2, tdst, M, N, L, shift);
+                THINKER_RET_CHECK(API_LIB(split_mat_mul_i16i16o32)(tsrc1, tsrc2, tdst, M, N, L, shift), "luna_split_mat_mul_i16i16o32");
             }
         }
     } else { // lhs->dtype_ == Int32
@@ -107,26 +105,26 @@ int32_t bmmint_luna(tTensor *lhs, tTensor *rhs, tTensor *out, tTensor *workspace
                 int32_t *tsrc1 = (int32_t *)lhs->dptr_ + i * src1_offset;
                 int32_t *tsrc2 = (int32_t *)rhs->dptr_ + i * src2_offset;
                 int8_t *tdst = (int8_t *)out->dptr_ + i * dst_offset;
-                ret = API_LIB(split_mat_mul_i32i32o8)(tsrc1, tsrc2, tdst, M, N, L, shift);
+                THINKER_RET_CHECK(API_LIB(split_mat_mul_i32i32o8)(tsrc1, tsrc2, tdst, M, N, L, shift), "luna_split_mat_mul_i32i32o8");
             }
         } else if (out->dtype_ == Int16) {
             for (int32_t i = 0; i < batch; ++i) {
                 int32_t *tsrc1 = (int32_t *)lhs->dptr_ + i * src1_offset;
                 int32_t *tsrc2 = (int32_t *)rhs->dptr_ + i * src2_offset;
                 int16_t *tdst = (int16_t *)out->dptr_ + i * dst_offset;
-                ret = API_LIB(split_mat_mul_i32i32o16)(tsrc1, tsrc2, tdst, M, N, L, shift);
+                THINKER_RET_CHECK(API_LIB(split_mat_mul_i32i32o16)(tsrc1, tsrc2, tdst, M, N, L, shift), "luna_split_mat_mul_i32i32o16");
             }
         } else { // out->dtype_ == Int32
             for (int32_t i = 0; i < batch; ++i) {
                 int32_t *tsrc1 = (int32_t *)lhs->dptr_ + i * src1_offset;
                 int32_t *tsrc2 = (int32_t *)rhs->dptr_ + i * src2_offset;
                 int32_t *tdst = (int32_t *)out->dptr_ + i * dst_offset;
-                ret = API_LIB(split_mat_mul_i32i32o32)(tsrc1, tsrc2, tdst, M, N, L, shift);
+                THINKER_RET_CHECK(API_LIB(split_mat_mul_i32i32o32)(tsrc1, tsrc2, tdst, M, N, L, shift), "luna_split_mat_mul_i32i32o32");
             }
         }
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif  //_BMMINT_VENUS_H_

@@ -24,9 +24,7 @@
  * @param attr Operation attributes
  * @return int32_t Operation status
  */
-int32_t gluint_luna(tTensor *X, tTensor *Y, tTensor *workspace, GluIntAttrs *attr) 
-{
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
+int32_t gluint_luna(tTensor *X, tTensor *Y, tTensor *workspace, GluIntAttrs *attr) {
     const int32_t Q_SIGMOID_IN = 27;
     const int32_t Q_SIGMOID_OU = 15;
 
@@ -59,9 +57,9 @@ int32_t gluint_luna(tTensor *X, tTensor *Y, tTensor *workspace, GluIntAttrs *att
 
     // Matrix transpose based on size
     if (align_size <= 16384)
-        ret = API_LIB(mat_trans_i8o8)(input, transposed_input, M, N);
+        THINKER_RET_CHECK(API_LIB(mat_trans_i8o8)(input, transposed_input, M, N), "luna_mat_trans_i8o8");
     else if (align_size <= 32768)
-        ret = API_LIB(split_mat_trans_i8o8)(input, transposed_input, M, N);
+        THINKER_RET_CHECK(API_LIB(split_mat_trans_i8o8)(input, transposed_input, M, N), "luna_split_mat_trans_i8o8");
     else
         return T_ERR_FAIL;
 
@@ -71,20 +69,20 @@ int32_t gluint_luna(tTensor *X, tTensor *Y, tTensor *workspace, GluIntAttrs *att
     int32_t *b = input_data + half_size;
 
     // Data processing steps
-    ret |= API_LIB(scale_i8i8o32)(transposed_input, 1, input_data, size, 0);
-    ret |= API_LIB(scale_i32i32o32)(b, 1UL << (Q_SIGMOID_IN - x_q), b, half_size, 0);
-    ret |= API_LIB(sigmoid_i32o32)(b, b, half_size);
-    ret |= API_LIB(scale_i32i32o32)(b, 1, b, half_size, Q_SIGMOID_OU + x_q - y_q);
+    THINKER_RET_CHECK(API_LIB(scale_i8i8o32)(transposed_input, 1, input_data, size, 0), "luna_scale_i8i8o32");
+    THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(b, 1UL << (Q_SIGMOID_IN - x_q), b, half_size, 0), "luna_scale_i32i32o32");
+    THINKER_RET_CHECK(API_LIB(sigmoid_i32o32)(b, b, half_size), "luna_sigmoid_i32o32");
+    THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(b, 1, b, half_size, Q_SIGMOID_OU + x_q - y_q), "luna_scale_i32i32o32");
     
     // Final output transformation
     if (align_size <= 32768)
-        ret |= API_LIB(mat_trans_i8o8)(temp_output, output, N/2, M);
+        THINKER_RET_CHECK(API_LIB(mat_trans_i8o8)(temp_output, output, N/2, M), "luna_mat_trans_i8o8");
     else if (align_size <= 65536)
-        ret |= API_LIB(split_mat_trans_i8o8)(temp_output, output, N/2, M);
+        THINKER_RET_CHECK(API_LIB(split_mat_trans_i8o8)(temp_output, output, N/2, M), "luna_split_mat_trans_i8o8");
     else
-        ret = T_ERR_FAIL;
+        return T_ERR_FAIL;
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif  //_GLUINT_LUNA_H_

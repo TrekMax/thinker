@@ -29,15 +29,14 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     // Validate tensor count
     CHECK_EQ(num_tensor, (op->num_input_ + op->num_output_));
     
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
     FlattenAttrs *attr = (FlattenAttrs *)((int8_t *)op + op->attr_offset_);
     
 #if THINKER_USE_VENUS || THINKER_USE_ARCS || THINKER_USE_VENUSA
     // Call hardware-specific flatten implementation
-    ret = flatten_luna(tensors[0], tensors[op->num_input_], attr);
+    THINKER_RET_CHECK(flatten_luna(tensors[0], tensors[op->num_input_], attr), "flatten_luna");
 #endif
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #include "core/operator_template.h"

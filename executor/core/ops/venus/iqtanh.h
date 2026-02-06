@@ -32,13 +32,13 @@ int32_t iqtanh(tTensor *X, tTensor *Y) {
     // Check if input quantization matches expected
     if (X->scale_ != Q_INPUT) {
         // Scale input to match Q_INPUT quantization
-        API_LIB(scale_q15_int16)(src, 1, src, size, X->scale_ - Q_INPUT);
+        THINKER_RET_CHECK(API_LIB(scale_q15_int16)(src, 1, src, size, X->scale_ - Q_INPUT), "luna_scale_q15_int16");
     }
 
     // Compute tanh and store result
-    int32_t ret = API_LIB(tanh_int8)(src, dst, size);
+    THINKER_RET_CHECK(API_LIB(tanh_int8)(src, dst, size), "luna_tanh_int8");
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif

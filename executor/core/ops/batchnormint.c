@@ -22,9 +22,7 @@
 int32_t X(Forward)(tOperator* op, tTensor** tensors, int32_t num_tensor, tDMA_List* list) {
     // Validate input tensor count
     CHECK_GE(num_tensor, (op->num_input_ + op->num_output_));
-    
-    int32_t ret = T_ERR_NO_IMPLEMENTED;  // Default error return
-    
+   
     // Extract input tensors
     tTensor* X = ((tTensor**)tensors)[0];     // Input tensor
     tTensor* W = ((tTensor**)tensors)[1];     // Weight tensor
@@ -39,7 +37,7 @@ int32_t X(Forward)(tOperator* op, tTensor** tensors, int32_t num_tensor, tDMA_Li
         
         // Get workspace tensor and call platform-specific implementation
         tTensor* workspace = ((tTensor**)tensors)[num_tensor - 1];
-        ret = batchnormint_luna(X, W, Bias, Y, workspace);
+        THINKER_RET_CHECK(batchnormint_luna(X, W, Bias, Y, workspace), "batchnormint_luna");
         
         #if THINKER_PROFILE
         uint64_t finish_t = tick_count();  // Record end time for profiling
@@ -48,7 +46,7 @@ int32_t X(Forward)(tOperator* op, tTensor** tensors, int32_t num_tensor, tDMA_Li
         #endif
     #endif
 
-    return ret;  // Return result code
+    return T_SUCCESS;  // Return result code
 }
 
 #include "core/operator_template.h"

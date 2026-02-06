@@ -134,7 +134,7 @@ int32_t concat_luna(tTensor **tensors, int32_t axis, int32_t input_num,
                             }
                         } else {
                             if ((2 == tensors[i]->mem_.type_) && (2 == output->mem_.type_))
-                                API_LIB(memcpy)(output_ptr, indptr_curr, hw_curr);
+                                THINKER_RET_CHECK(API_LIB(memcpy)(output_ptr, indptr_curr, hw_curr), "luna_memcpy");
                             else
                                 memcpy(output_ptr, indptr_curr, hw_curr);
                         }

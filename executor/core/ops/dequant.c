@@ -31,8 +31,6 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
         workspace = tensors[num_tensor - 1];
     }
     
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
-    
     // Validate input data type
     if ((X->dtype_ != Int8) && (X->dtype_ != Uint8) && (X->dtype_ != Int32))
         return T_ERR_INVALID_DATATYPE;

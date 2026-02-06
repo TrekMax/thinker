@@ -24,9 +24,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     
     // Get operator attributes
     ArgMaxAttrs *attrs = (ArgMaxAttrs *)((int8_t *)op + op->attr_offset_);
-    
-    int32_t ret = T_ERR_NO_IMPLEMENTED;  // Default error return
-    
+       
     // Check if any platform is enabled
     #if THINKER_USE_VENUS || THINKER_USE_ARCS || THINKER_USE_VENUSA
         #if THINKER_PROFILE
@@ -34,7 +32,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
         #endif
         
         // Call platform-specific ArgMax implementation
-        ret = argmax_luna(tensors[0], tensors[op->num_input_], tensors[num_tensor - 1], attrs);
+        THINKER_RET_CHECK(argmax_luna(tensors[0], tensors[op->num_input_], tensors[num_tensor - 1], attrs), "argmax_luna");
         
         #if THINKER_PROFILE
         uint64_t finish_t = tick_count();  // Record end time for profiling
@@ -43,7 +41,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
         #endif
     #endif
 
-    return ret;  // Return result code
+    return T_SUCCESS;  // Return result code
 }
 
 #include "core/operator_template.h"

@@ -25,7 +25,6 @@
  * @return int32_t Execution status
  */
 int32_t argmax_luna(tTensor *X, tTensor *Y, tTensor *work_space, ArgMaxAttrs *attrs) {
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
     int32_t axis = attrs->axis;
     int32_t n_dims = X->shape_.ndim_;
     int32_t once_size = (axis == -1) ? X->shape_.dims_[n_dims - 1] : X->shape_.dims_[axis];
@@ -46,7 +45,7 @@ int32_t argmax_luna(tTensor *X, tTensor *Y, tTensor *work_space, ArgMaxAttrs *at
         case Int8: {
             for (int i = 0; i < leading; i++) {
                 int8_t *p_src = (int8_t *)X->dptr_ + i * once_size;
-                ret = API_LIB(max_i8o32)(p_src, p_tmp, once_size);
+                THINKER_RET_CHECK(API_LIB(max_i8o32)(p_src, p_tmp, once_size), "luna_max_i8o32");
                 p_dst_val[i] = (int32_t)p_tmp[0];
                 p_dst_idx[i] = (int32_t)p_tmp[1];
             }
@@ -55,7 +54,7 @@ int32_t argmax_luna(tTensor *X, tTensor *Y, tTensor *work_space, ArgMaxAttrs *at
         case Int32: {
             for (int i = 0; i < leading; i++) {
                 int32_t *p_src = (int32_t *)X->dptr_ + i * once_size;
-                ret = API_LIB(max_i32o32)(p_src, p_tmp, once_size);
+                THINKER_RET_CHECK(API_LIB(max_i32o32)(p_src, p_tmp, once_size), "luna_max_i32o32");
                 p_dst_val[i] = (int32_t)p_tmp[0];
                 p_dst_idx[i] = (int32_t)p_tmp[1];
             }
@@ -65,7 +64,7 @@ int32_t argmax_luna(tTensor *X, tTensor *Y, tTensor *work_space, ArgMaxAttrs *at
             return T_ERR_INVALID_DATATYPE;
     }
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif

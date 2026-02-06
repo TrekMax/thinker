@@ -32,7 +32,6 @@ int32_t X(Forward)(tOperator* op, tTensor** tensors, int32_t num_tensor, tDMA_Li
     
     // Get GRU attributes
     GRUIntAttrs* attr = (GRUIntAttrs*)((int8_t*)op + op->attr_offset_);
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
 
     // Get all tensor pointers
     tTensor* input = tensors[0];
@@ -81,8 +80,8 @@ int32_t X(Forward)(tOperator* op, tTensor** tensors, int32_t num_tensor, tDMA_Li
         tTensor h2h_bias_temp     = h2h_bias[0];
         h2h_bias_temp.dptr_          = dma_temp->dptr_;
 
-        ret = gruint_luna(input, &hidden_i_inst, i2h_w, h2h_w, i2h_bias, h2h_bias,
-                      &mask, output, hidden_o, attr, workspace);
+        THINKER_RET_CHECK(gruint_luna(input, &hidden_i_inst, i2h_w, h2h_w, i2h_bias, h2h_bias,
+                      &mask, output, hidden_o, attr, workspace), "gruint_luna");
     }
 #elif defined(THINKER_USE_ARCS) || defined(THINKER_USE_VENUSA)
     // ARC/VENUSA hardware implementation
@@ -105,8 +104,8 @@ int32_t X(Forward)(tOperator* op, tTensor** tensors, int32_t num_tensor, tDMA_Li
             tTensor h2h_bias_temp     = h2h_bias[0];
             h2h_bias_temp.dptr_          = dma_temp->dptr_;
 
-            ret = gruint_luna(input, &hidden_i_inst, i2h_w, h2h_w, i2h_bias, h2h_bias,
-                          &mask, output, hidden_o, attr, workspace);
+            THINKER_RET_CHECK(gruint_luna(input, &hidden_i_inst, i2h_w, h2h_w, i2h_bias, h2h_bias,
+                          &mask, output, hidden_o, attr, workspace), "gruint_luna");
         }
     }
     else {
@@ -114,8 +113,8 @@ int32_t X(Forward)(tOperator* op, tTensor** tensors, int32_t num_tensor, tDMA_Li
             workspace = tensors[op->num_input_ + op->num_output_];
         }
 
-        ret = gruint_luna(input, &hidden_i_inst, i2h_w, h2h_w, i2h_bias, h2h_bias,
-                          &mask, output, hidden_o, attr, workspace);
+        THINKER_RET_CHECK(gruint_luna(input, &hidden_i_inst, i2h_w, h2h_w, i2h_bias, h2h_bias,
+                          &mask, output, hidden_o, attr, workspace), "gruint_luna");
     }
 #endif
 
@@ -125,7 +124,7 @@ int32_t X(Forward)(tOperator* op, tTensor** tensors, int32_t num_tensor, tDMA_Li
     printf("%8s | %u | (","GruInt", total_t);  
 #endif
     
-    return ret;
+    return T_SUCCESS;
 }
 
 #include "core/operator_template.h"

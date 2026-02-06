@@ -52,7 +52,6 @@ int32_t X(Forward)(tOperator* op, tTensor** tensors, int32_t num_tensor, tDMA_Li
     tTensor* Temp = NULL;
     tTensor* dma_temp = NULL;
     tTensor Weight_temp = W[0];
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
     
 #if THINKER_USE_VENUS || THINKER_USE_ARCS || THINKER_USE_VENUSA
 #if THINKER_PROFILE
@@ -80,10 +79,10 @@ int32_t X(Forward)(tOperator* op, tTensor** tensors, int32_t num_tensor, tDMA_Li
             Bias_temp.scale_ = X->scale_ + W->scale_;
             int32_t size = getShapeSize(&(W->shape_));
             Bias_temp.dptr_ = (addr_type)((int8_t*)Weight_temp.dptr_ + ALIGN16(size));
-            ret = deconv2dint_luna(X, &Weight_temp, &Bias_temp, Y, Temp, attrs);
+            THINKER_RET_CHECK(deconv2dint_luna(X, &Weight_temp, &Bias_temp, Y, Temp, attrs), "deconv2dint_luna");
         } 
         else {
-            ret = deconv2dint_luna(X, &Weight_temp, NULL, Y, Temp, attrs);
+            THINKER_RET_CHECK(deconv2dint_luna(X, &Weight_temp, NULL, Y, Temp, attrs), "deconv2dint_luna");
         }
     }
     else {
@@ -95,10 +94,10 @@ int32_t X(Forward)(tOperator* op, tTensor** tensors, int32_t num_tensor, tDMA_Li
             tTensor* Bias = ((tTensor**)tensors)[op->num_input_ - 1];
             tTensor Bias_temp = Bias[0];
             Bias_temp.scale_ = X->scale_ + W->scale_;
-            ret = deconv2dint_luna(X, &Weight_temp, &Bias_temp, Y, Temp, attrs);
+            THINKER_RET_CHECK(deconv2dint_luna(X, &Weight_temp, &Bias_temp, Y, Temp, attrs), "deconv2dint_luna");
         } 
         else {
-            ret = deconv2dint_luna(X, &Weight_temp, NULL, Y, Temp, attrs);
+            THINKER_RET_CHECK(deconv2dint_luna(X, &Weight_temp, NULL, Y, Temp, attrs), "deconv2dint_luna");
         }
     }
     
@@ -109,7 +108,7 @@ int32_t X(Forward)(tOperator* op, tTensor** tensors, int32_t num_tensor, tDMA_Li
 #endif
 #endif
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #include "core/operator_template.h"

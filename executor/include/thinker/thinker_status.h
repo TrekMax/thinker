@@ -28,4 +28,13 @@ typedef enum _thinker_StatusCode_ {
     T_ERR_NO_SUPPORT_OP = 50000,  // Unsupported operation error
 } tStatus;
 
+#define THINKER_RET_CHECK(func_call, func_name) \
+    do { \
+        tStatus ret = func_call; \
+        if (ret != T_SUCCESS) { \
+            printf("Failed to %s: ret = %d\n", func_name, ret); \
+            return ret; \
+        } \
+    } while (0)
+
 #endif  // _THINKER_STATUS_H_

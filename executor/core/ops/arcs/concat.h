@@ -61,8 +61,6 @@ void scale_requant32bit_cpu(int32_t *src, int32_t *dst, int32_t size, int8_t sca
 }
 
 int32_t concat_luna(tTensor **tensors, int32_t axis, int32_t input_num, tTensor *workspace, tTensor *output) {
-  int32_t ret = T_ERR_NO_IMPLEMENTED;
-
   int32_t leading = 1, middle = 1, trailing = 1;
   for (int32_t i = 0; i < axis; ++i) 
   {
@@ -94,20 +92,19 @@ int32_t concat_luna(tTensor **tensors, int32_t axis, int32_t input_num, tTensor 
 
         if (input_scale == output_scale) {
           if (2 == output->mem_.type_) {
-            ret = API_LIB(memcpy_i8o8)(dst, src, hw_curr);
+            THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(dst, src, hw_curr), "luna_memcpy_i8o8");
           } 
           else {
             opi_psram_cpy_out(dst, src, hw_curr);
-            ret = T_SUCCESS;
           }
         } 
         else {
           if (2 == tensors[i]->mem_.type_ && 2 == output->mem_.type_) { // both input and output on share
             if (input_scale < output_scale) {
-              ret = API_LIB(scale_i8i8o8)(src, 1UL<<(output_scale - input_scale), dst, hw_curr, 0);
+              THINKER_RET_CHECK(API_LIB(scale_i8i8o8)(src, 1UL<<(output_scale - input_scale), dst, hw_curr, 0), "luna_scale_i8i8o8");
             }
             else {
-              ret = API_LIB(scale_i8i8o8)(src, 1, dst, hw_curr, (input_scale - output_scale));
+              THINKER_RET_CHECK(API_LIB(scale_i8i8o8)(src, 1, dst, hw_curr, (input_scale - output_scale)), "luna_scale_i8i8o8");
             }
           }
           else if (2 != tensors[i]->mem_.type_ && 2 == output->mem_.type_) { // input on psram, output on share
@@ -121,13 +118,13 @@ int32_t concat_luna(tTensor **tensors, int32_t axis, int32_t input_num, tTensor 
               int32_t remain_size = hw_curr - past_size;
               int32_t cur_size = (workspace_size < remain_size)? workspace_size : remain_size; 
 
-              ret = API_LIB(memcpy_i8o8)(tmp_ptr, src + past_size, cur_size);
+              THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(tmp_ptr, src + past_size, cur_size), "luna_memcpy_i8i8o8");
 
               if (input_scale < output_scale) {
-                ret = API_LIB(scale_i8i8o8)(tmp_ptr, 1UL<<(output_scale - input_scale), dst + past_size, cur_size, 0);
+                THINKER_RET_CHECK(API_LIB(scale_i8i8o8)(tmp_ptr, 1UL<<(output_scale - input_scale), dst + past_size, cur_size, 0), "luna_scale_i8i8o8");
               }
               else {
-                ret = API_LIB(scale_i8i8o8)(tmp_ptr, 1, dst + past_size, cur_size, (input_scale - output_scale));
+                THINKER_RET_CHECK(API_LIB(scale_i8i8o8)(tmp_ptr, 1, dst + past_size, cur_size, (input_scale - output_scale)), "luna_scale_i8i8o8");
               }
 
               past_size += cur_size;
@@ -145,10 +142,10 @@ int32_t concat_luna(tTensor **tensors, int32_t axis, int32_t input_num, tTensor 
               int32_t cur_size = (workspace_size < remain_size)? workspace_size : remain_size; 
 
               if (input_scale < output_scale) {
-                ret = API_LIB(scale_i8i8o8)(src + past_size, 1UL<<(output_scale - input_scale), tmp_ptr, cur_size, 0);
+                THINKER_RET_CHECK(API_LIB(scale_i8i8o8)(src + past_size, 1UL<<(output_scale - input_scale), tmp_ptr, cur_size, 0), "luna_scale_i8i8o8");
               }
               else {
-                ret = API_LIB(scale_i8i8o8)(src + past_size, 1, tmp_ptr, cur_size, (input_scale - output_scale));
+                THINKER_RET_CHECK(API_LIB(scale_i8i8o8)(src + past_size, 1, tmp_ptr, cur_size, (input_scale - output_scale)), "luna_scale_i8i8o8");
               }
 
               opi_psram_cpy_out(dst + past_size, tmp_ptr, cur_size);
@@ -166,13 +163,13 @@ int32_t concat_luna(tTensor **tensors, int32_t axis, int32_t input_num, tTensor 
               int32_t remain_size = hw_curr - past_size;
               int32_t cur_size = (workspace_size < remain_size)? workspace_size : remain_size; 
 
-              ret = API_LIB(memcpy_i8o8)(tmp_ptr, src + past_size, cur_size);
+              THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(tmp_ptr, src + past_size, cur_size), "luna_memcpy_i8o8");
 
               if (input_scale < output_scale) {
-                ret = API_LIB(scale_i8i8o8)(tmp_ptr, 1UL<<(output_scale - input_scale), tmp_ptr, cur_size, 0);
+                THINKER_RET_CHECK(API_LIB(scale_i8i8o8)(tmp_ptr, 1UL<<(output_scale - input_scale), tmp_ptr, cur_size, 0), "luna_scale_i8i8o8");
               }
               else {
-                ret = API_LIB(scale_i8i8o8)(tmp_ptr, 1, tmp_ptr, cur_size, (input_scale - output_scale));
+                THINKER_RET_CHECK(API_LIB(scale_i8i8o8)(tmp_ptr, 1, tmp_ptr, cur_size, (input_scale - output_scale)), "luna_scale_i8i8o8");
               }
 
               opi_psram_cpy_out(dst + past_size, tmp_ptr, cur_size);
@@ -197,9 +194,9 @@ int32_t concat_luna(tTensor **tensors, int32_t axis, int32_t input_num, tTensor 
         if (input_scale == output_scale) {
           if (2 == tensors[i]->mem_.type_ && 2 == output->mem_.type_) {
             if (trailing != 1)                     // 3维矩阵拼接
-              ret = API_LIB(mat_copy_i8o8)(src, dst, leading, tensors[i]->shape_.dims_[axis], trailing, trailing * tensors[i]->shape_.dims_[axis], trailing, trailing*middle, trailing);
+              THINKER_RET_CHECK(API_LIB(mat_copy_i8o8)(src, dst, leading, tensors[i]->shape_.dims_[axis], trailing, trailing * tensors[i]->shape_.dims_[axis], trailing, trailing*middle, trailing), "luna_mat_copy_i8o8");
             else                                   // trailing为1时，可转换为2维矩阵
-              ret = API_LIB(mat_copy_i8o8)(src, dst, 1, leading, tensors[i]->shape_.dims_[axis], leading * tensors[i]->shape_.dims_[axis], tensors[i]->shape_.dims_[axis], leading * middle, middle);
+              THINKER_RET_CHECK(API_LIB(mat_copy_i8o8)(src, dst, 1, leading, tensors[i]->shape_.dims_[axis], leading * tensors[i]->shape_.dims_[axis], tensors[i]->shape_.dims_[axis], leading * middle, middle), "luna_mat_copy_i8o8");
           } 
           else {
             for (int32_t l = 0; l < leading; l++) 
@@ -207,11 +204,10 @@ int32_t concat_luna(tTensor **tensors, int32_t axis, int32_t input_num, tTensor 
               int8_t *indptr_curr = (int8_t *)src + l * hw_curr;
               int8_t *output_ptr  = (int8_t *)dst + l * hw;
               if (2 == output->mem_.type_) {
-                ret = API_LIB(memcpy_i8o8)(output_ptr, indptr_curr, trailing * tensors[i]->shape_.dims_[axis]);
+                THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(output_ptr, indptr_curr, trailing * tensors[i]->shape_.dims_[axis]), "luna_memcpy_i8o8");
               }
               else {
                 opi_psram_cpy_out(output_ptr, indptr_curr, trailing * tensors[i]->shape_.dims_[axis]);
-                ret = T_SUCCESS;
               }
             }
           }
@@ -226,10 +222,10 @@ int32_t concat_luna(tTensor **tensors, int32_t axis, int32_t input_num, tTensor 
 
               if (2 != tensors[i]->mem_.type_) {
                 src_ptr = (int8_t *)workspace->dptr_;
-                ret = API_LIB(memcpy_i8o8)(src_ptr, src + l * hw_curr, hw_curr);
+                THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(src_ptr, src + l * hw_curr, hw_curr), "luna_memcpy_i8o8");
               }
 
-              ret = API_LIB(scale_i8i8o8)(src_ptr, scalar, dst + l * hw, hw_curr, shift);
+              THINKER_RET_CHECK(API_LIB(scale_i8i8o8)(src_ptr, scalar, dst + l * hw, hw_curr, shift), "luna_scale_i8i8o8");
             }
           } 
           else { // output on psram
@@ -239,10 +235,10 @@ int32_t concat_luna(tTensor **tensors, int32_t axis, int32_t input_num, tTensor 
 
               if (2 != tensors[i]->mem_.type_) {
                 src_ptr = tmp;
-                ret = API_LIB(memcpy_i8o8)(src_ptr, src + l * hw_curr, hw_curr);
+                THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(src_ptr, src + l * hw_curr, hw_curr), "luna_memcpy_i8o8");
               }
 
-              ret = API_LIB(scale_i8i8o8)(src_ptr, scalar, tmp, hw_curr, shift);
+              THINKER_RET_CHECK(API_LIB(scale_i8i8o8)(src_ptr, scalar, tmp, hw_curr, shift), "luna_scale_i8i8o8");
               opi_psram_cpy_out(dst + l * hw, tmp, hw_curr);
             }
           }
@@ -267,15 +263,13 @@ int32_t concat_luna(tTensor **tensors, int32_t axis, int32_t input_num, tTensor 
 
         if (input_scale != output_scale) {
           scale_requant16bit_cpu(src, dst + i * hw_curr * 2, hw_curr, output_scale-input_scale);
-          ret = T_SUCCESS;
         }
         else {
         	if (2 == output->mem_.type_) {
-        		ret = API_LIB(memcpy_i8o8)((int8_t *)dst + i * hw_curr * 2, (int8_t *)src, hw_curr * 2);
+        		THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)dst + i * hw_curr * 2, (int8_t *)src, hw_curr * 2), "luna_memcpy_i8o8");
         	}
         	else {
         		opi_psram_cpy_out((int8_t *)dst + i * hw_curr * 2, (int8_t *)src, hw_curr * 2);
-        		ret = T_SUCCESS;
         	}
         }
       }
@@ -297,7 +291,6 @@ int32_t concat_luna(tTensor **tensors, int32_t axis, int32_t input_num, tTensor 
             int16_t *output_ptr  = (int16_t *)dst + l * hw + i * hw_curr;
 
             scale_requant16bit_cpu(indptr_curr, output_ptr, hw_curr, output_scale-input_scale);
-            ret = T_SUCCESS;
           }
         }
         else { 
@@ -305,11 +298,10 @@ int32_t concat_luna(tTensor **tensors, int32_t axis, int32_t input_num, tTensor 
             int16_t *indptr_curr = (int16_t *)src + l * hw_curr;
             int16_t *output_ptr  = (int16_t *)dst + l * hw + i * hw_curr;
             if (2 == output->mem_.type_) {
-            	ret = API_LIB(memcpy_i8o8)((int8_t *)output_ptr, (int8_t *)indptr_curr, hw_curr * 2);
+            	THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)output_ptr, (int8_t *)indptr_curr, hw_curr * 2), "luna_memcpy_i8o8");
             }
             else {
             	opi_psram_cpy_out((int8_t *)output_ptr, (int8_t *)indptr_curr, hw_curr * 2);
-            	ret = T_SUCCESS;
             }
           }
         }
@@ -320,102 +312,100 @@ int32_t concat_luna(tTensor **tensors, int32_t axis, int32_t input_num, tTensor 
     int32_t *dst = (int32_t *)output->dptr_;
     if (leading == 1) {    // 最外层维度进行拼接
       if (2 == output->mem_.type_) {
-		  for (int32_t i = 0; i < input_num; ++i)  // 支持多个输入
-		  {
-			if (Int32 != tensors[i]->dtype_)
-			  return T_ERR_INVALID_DATATYPE;
+        for (int32_t i = 0; i < input_num; ++i)  // 支持多个输入
+        {
+          if (Int32 != tensors[i]->dtype_)
+            return T_ERR_INVALID_DATATYPE;
 
-			int32_t *src 		= (int32_t *)tensors[i]->dptr_;
-			int32_t input_scale = tensors[i]->scale_;
-			int32_t hw_curr 	= tensors[i]->shape_.dims_[axis] * trailing;
-			if (0 == hw_curr)
-			  continue;
+          int32_t *src 		= (int32_t *)tensors[i]->dptr_;
+          int32_t input_scale = tensors[i]->scale_;
+          int32_t hw_curr 	= tensors[i]->shape_.dims_[axis] * trailing;
+          if (0 == hw_curr)
+            continue;
 
-			if (input_scale == output_scale) {
-				ret = API_LIB(memcpy_i8o8)((int8_t *)dst, (int8_t *)src, hw_curr * 4);
-				dst += hw_curr;
-			}
-			else {
-			  return T_ERR_INVALID_PARA;
-			}
-		  }
+          if (input_scale == output_scale) {
+            THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)dst, (int8_t *)src, hw_curr * 4), "luna_memcpy_i8o8");
+            dst += hw_curr;
+          }
+          else {
+            return T_ERR_INVALID_PARA;
+          }
+        }
       }
       else {
-		  for (int32_t i = 0; i < input_num; ++i)  // 支持多个输入
-		  {
-			if (Int32 != tensors[i]->dtype_)
-			  return T_ERR_INVALID_DATATYPE;
+        for (int32_t i = 0; i < input_num; ++i)  // 支持多个输入
+        {
+          if (Int32 != tensors[i]->dtype_)
+            return T_ERR_INVALID_DATATYPE;
 
-			int32_t *src 		= (int32_t *)tensors[i]->dptr_;
-			int32_t input_scale = tensors[i]->scale_;
-			int32_t hw_curr 	= tensors[i]->shape_.dims_[axis] * trailing;
-			if (0 == hw_curr)
-			  continue;
+          int32_t *src 		= (int32_t *)tensors[i]->dptr_;
+          int32_t input_scale = tensors[i]->scale_;
+          int32_t hw_curr 	= tensors[i]->shape_.dims_[axis] * trailing;
+          if (0 == hw_curr)
+            continue;
 
-			if (input_scale == output_scale) {
-				opi_psram_cpy_out(dst, src, hw_curr * 4);
-				dst += hw_curr;
-				ret = T_SUCCESS;
-			}
-			else {
-			  return T_ERR_INVALID_PARA;
-			}
-		  }
+          if (input_scale == output_scale) {
+            opi_psram_cpy_out(dst, src, hw_curr * 4);
+            dst += hw_curr;
+          }
+          else {
+            return T_ERR_INVALID_PARA;
+          }
+        }
       }
     }
     else {                // 中间或者最里层维度拼接
       if (2 == output->mem_.type_) {
-		  for (int32_t i = 0; i < input_num; ++i) { // 支持多个输入
-			if (Int32 != tensors[i]->dtype_)
-			  return T_ERR_INVALID_DATATYPE;
+        for (int32_t i = 0; i < input_num; ++i) { // 支持多个输入
+          if (Int32 != tensors[i]->dtype_)
+            return T_ERR_INVALID_DATATYPE;
 
-			int32_t *src        = (int32_t *)tensors[i]->dptr_;
-			int32_t input_scale = tensors[i]->scale_;
-			int32_t hw_curr     = tensors[i]->shape_.dims_[axis] * trailing;
-			if (0 == hw_curr)
-			  continue;
+          int32_t *src        = (int32_t *)tensors[i]->dptr_;
+          int32_t input_scale = tensors[i]->scale_;
+          int32_t hw_curr     = tensors[i]->shape_.dims_[axis] * trailing;
+          if (0 == hw_curr)
+            continue;
 
-			if (input_scale == output_scale) {
-			  for (int32_t l = 0; l < leading; l++) {
-				int32_t *indptr_curr = (int32_t *)src + l * hw_curr;
-				int32_t *output_ptr  = (int32_t *)dst + l * hw + i * hw_curr;
-				ret = API_LIB(memcpy_i8o8)((int8_t *)output_ptr, (int8_t *)indptr_curr, hw_curr * 4);
-			  }
-			}
-			else {
-			  return T_ERR_INVALID_DATATYPE;
-			}
-		  }
+          if (input_scale == output_scale) {
+            for (int32_t l = 0; l < leading; l++) {
+            int32_t *indptr_curr = (int32_t *)src + l * hw_curr;
+            int32_t *output_ptr  = (int32_t *)dst + l * hw + i * hw_curr;
+            THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)output_ptr, (int8_t *)indptr_curr, hw_curr * 4), "luna_memcpy_i8o8");
+            }
+          }
+          else {
+            return T_ERR_INVALID_DATATYPE;
+          }
+        }
       }
       else {
-		  for (int32_t i = 0; i < input_num; ++i) { // 支持多个输入
-			if (Int32 != tensors[i]->dtype_)
-			  return T_ERR_INVALID_DATATYPE;
+        for (int32_t i = 0; i < input_num; ++i) { // 支持多个输入
+          if (Int32 != tensors[i]->dtype_)
+            return T_ERR_INVALID_DATATYPE;
 
-			int32_t *src        = (int32_t *)tensors[i]->dptr_;
-			int32_t input_scale = tensors[i]->scale_;
-			int32_t hw_curr     = tensors[i]->shape_.dims_[axis] * trailing;
-			if (0 == hw_curr)
-			  continue;
+          int32_t *src        = (int32_t *)tensors[i]->dptr_;
+          int32_t input_scale = tensors[i]->scale_;
+          int32_t hw_curr     = tensors[i]->shape_.dims_[axis] * trailing;
+          if (0 == hw_curr)
+            continue;
 
-			if (input_scale == output_scale) {
-			  for (int32_t l = 0; l < leading; l++) {
-				int32_t *indptr_curr = (int32_t *)src + l * hw_curr;
-				int32_t *output_ptr  = (int32_t *)dst + l * hw + i * hw_curr;
-				opi_psram_cpy_out((int8_t *)output_ptr, (int8_t *)indptr_curr, hw_curr * 4);
-				ret = T_SUCCESS;
-			  }
-			}
-			else {
-			  return T_ERR_INVALID_DATATYPE;
-			}
-		  }
+          if (input_scale == output_scale) {
+            for (int32_t l = 0; l < leading; l++) {
+            int32_t *indptr_curr = (int32_t *)src + l * hw_curr;
+            int32_t *output_ptr  = (int32_t *)dst + l * hw + i * hw_curr;
+            opi_psram_cpy_out((int8_t *)output_ptr, (int8_t *)indptr_curr, hw_curr * 4);
+            }
+          }
+          else {
+            return T_ERR_INVALID_DATATYPE;
+          }
+        }
       }
     }
   }
   else {
-    ret = T_ERR_INVALID_DATATYPE;
+    return T_ERR_INVALID_DATATYPE;
   }
-  return ret;
+  return T_SUCCESS;
 }
 #endif

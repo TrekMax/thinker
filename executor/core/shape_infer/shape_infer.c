@@ -39,7 +39,6 @@ static tStatus tScalarGraphInit(const char *ptr, tScalarGraph *graph)
 
 tStatus tShapeInferInit(const char *res, tShapeInfer *shape_infer)
 {
-  tStatus ret = T_SUCCESS;
   const tShapeInferHdr shape_hdr = *(tShapeInferHdr *)(res);
   // calculate workspace size
   uint64_t total_size    = ALIGN16(sizeof(tScalarGraph));
@@ -58,8 +57,8 @@ tStatus tShapeInferInit(const char *res, tShapeInfer *shape_infer)
   shape_infer->graph_ = (tScalarGraph *)ptr;
   ptr += ALIGN16(sizeof(tScalarGraph));
   memcpy(ptr, res + shape_hdr.graph_offset_, shape_hdr.graph_size_);
-  ret = tScalarGraphInit(ptr, shape_infer->graph_);
-  if (ret != T_SUCCESS) return ret;
+  THINKER_RET_CHECK(tScalarGraphInit(ptr, shape_infer->graph_), "tScalarGraphInit");
+
   ptr += ALIGN16(shape_hdr.graph_size_);
   // init dy id pairs
   shape_infer->tid_pairs_   = (tTenDimPair *)ptr;
@@ -71,7 +70,7 @@ tStatus tShapeInferInit(const char *res, tShapeInfer *shape_infer)
   shape_infer->num_dy_axis_  = shape_hdr.num_dy_axis_;
   memcpy(ptr, res+shape_hdr.dy_axis_offset_, shape_hdr.num_dy_axis_*sizeof(tDyAxisInfo));
   ptr += ALIGN16(shape_hdr.num_dy_axis_ * sizeof(tDyAxisInfo));
-  return ret;
+  return T_SUCCESS;
 }
 
 tStatus tShapeInferFini(tShapeInfer *shape_infer)
@@ -82,7 +81,6 @@ tStatus tShapeInferFini(tShapeInfer *shape_infer)
 static tStatus tScalarGraphForward(tScalarGraph *graph, double *scalars)
 {
   // scalar graph inference
-  int32_t      ret = 0;
   int32_t      *op_ptr = graph->nodes_;
   ScalarOpType *op_type = NULL;
   int32_t      *input_ids = NULL;
@@ -99,8 +97,7 @@ static tStatus tScalarGraphForward(tScalarGraph *graph, double *scalars)
     for (int index = 0; index < input_num; ++index)
       node_io_ids[index] = input_ids[index];
     node_io_ids[input_num] = output_ids[0];
-    ret = ScalarFunc(scalars, op_type, node_io_ids, input_num);
-    if (ret != 0) return T_ERR_FAIL;
+    THINKER_RET_CHECK(ScalarFunc(scalars, op_type, node_io_ids, input_num), "ScalrFunc");
   }
   return T_SUCCESS;
 }
@@ -159,8 +156,7 @@ tStatus tSetShapeInferInputByNames(tShapeInfer *shape_infer, double *scalars,
 tStatus tShapeInferForward(tShapeInfer *shape_infer, double *scalars, tTensor *tensors)
 {
   tScalarGraph *graph = shape_infer->graph_;
-  tStatus ret = tScalarGraphForward(graph, scalars);
-  if (ret != T_SUCCESS) return ret;
+  THINKER_RET_CHECK(tScalarGraphForward(graph, scalars), "tScalarGraphForward");
   // assign scalar graph outputs to tensors shape by tTenDimPair.
   CHECK_EQ(shape_infer->num_id_pair_, graph->num_output_);
   for (int i = 0; i < shape_infer->num_id_pair_; ++i)

@@ -27,21 +27,19 @@
 int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_List *list) {
     // Validate tensor count
     CHECK_GE(num_tensor, (op->num_input_ + op->num_output_));
-    
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
-    
+
     // Get input, output, and workspace tensors
     tTensor *X = tensors[0];
     tTensor *Y = tensors[1];
     tTensor *workspace = tensors[2];
-    
+
 #if THINKER_USE_VENUS || THINKER_USE_ARCS || THINKER_USE_VENUSA
 #if THINKER_PROFILE
     uint64_t start_t = tick_count();
 #endif
 
     // Call hardware-specific sigmoid implementation
-    ret = iqsigmoid(X, Y, workspace);
+    THINKER_RET_CHECK(iqsigmoid(X, Y, workspace), "iqsigmoid");
 
 #if THINKER_PROFILE
     uint64_t finish_t = tick_count();
@@ -50,7 +48,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
 #endif
 #endif
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #include "core/operator_template.h"

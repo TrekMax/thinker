@@ -49,7 +49,7 @@ static int32_t luna_quant_ceil(int32_t x, int32_t shift) {
 }
 
 static int32_t img2col(int8_t *src, int8_t *dst, int32_t channel, int32_t height, int32_t kernel, int32_t stride){
-  int32_t ret = API_LIB(mat_trans_q7)(src, src, channel, height);
+  THINKER_RET_CHECK(API_LIB(mat_trans_q7)(src, src, channel, height), "luna_mat_trans_q7");
   int32_t num = (height - kernel) / stride + 1;
   int32_t data_size = channel * kernel;
   int32_t step_size = channel * stride;
@@ -57,133 +57,127 @@ static int32_t img2col(int8_t *src, int8_t *dst, int32_t channel, int32_t height
   {
     memcpy(dst + i * data_size, src + i *step_size, data_size);
   }
-  return ret;
+  return T_SUCCESS;
 }
 
 
 static int32_t calc_conv_luna(int32_t w_dtype, int32_t y_dtype, int8_t *input,
                               int8_t *weight, int32_t *bias, void *output,
                               s_conv_struct *conv_attrs) {
-  int32_t ret = 0;
   switch (w_dtype) {
     case Int4:
       switch (y_dtype) {
         case Int8:
-          ret = API_LIB(conv_intx_int8)((const int8_t *)input, (int8_t *)weight,
+          THINKER_RET_CHECK(API_LIB(conv_intx_int8)((const int8_t *)input, (int8_t *)weight,
                                     (int32_t *)bias, (int8_t *)output,
-                                    conv_attrs, 4);
-          break;
+                                    conv_attrs, 4), "luna_conv_intx_int8");
         case Int16:
-          ret = API_LIB(conv_intx_int16)((const int8_t *)input, (int8_t *)weight,
+          THINKER_RET_CHECK(API_LIB(conv_intx_int16)((const int8_t *)input, (int8_t *)weight,
                                      (int32_t *)bias, (int16_t *)output,
-                                     conv_attrs, 4);
+                                     conv_attrs, 4), "luna_conv_intx_int16");
           break;
         case Int32:
-          ret = API_LIB(conv_intx_int32)((const int8_t *)input, (int8_t *)weight,
+          THINKER_RET_CHECK(API_LIB(conv_intx_int32)((const int8_t *)input, (int8_t *)weight,
                                      (int32_t *)bias, (int32_t *)output,
-                                     conv_attrs, 4);
+                                     conv_attrs, 4), "luna_conv_intx_int32");
           break;
       }
       break;
     case Int8:
       switch (y_dtype) {
         case Int8:
-          ret =
-              API_LIB(conv_q7_int8)((const int8_t *)input, (int8_t *)weight,
-                                (int32_t *)bias, (int8_t *)output, conv_attrs);
+          THINKER_RET_CHECK(API_LIB(conv_q7_int8)((const int8_t *)input, (int8_t *)weight,
+                                (int32_t *)bias, (int8_t *)output, conv_attrs), "luna_conv_q7_int8");
           break;
         case Int16:
-          ret = API_LIB(conv_q7_int16)((const int8_t *)input, (int8_t *)weight,
+          THINKER_RET_CHECK(API_LIB(conv_q7_int16)((const int8_t *)input, (int8_t *)weight,
                                    (int32_t *)bias, (int16_t *)output,
-                                   conv_attrs);
+                                   conv_attrs), "luna_conv_q7_int16");
           break;
         case Int32:
-          ret = API_LIB(conv_q7_int32)((const int8_t *)input, (int8_t *)weight,
+          THINKER_RET_CHECK(API_LIB(conv_q7_int32)((const int8_t *)input, (int8_t *)weight,
                                    (int32_t *)bias, (int32_t *)output,
-                                   conv_attrs);
+                                   conv_attrs), "luna_conv_q7_int32");
           break;
       }
       break;
   }
 
-  return ret;
+  return T_SUCCESS;
 }
 
 static int32_t calc_depthwise_luna(int32_t w_dtype, int32_t y_dtype,
                                    int8_t *input, int8_t *weight, int32_t *bias,
                                    void *output, s_conv_struct *conv_attrs) {
-  int32_t ret = 0;
   switch (w_dtype) {
     case Int4:
       switch (y_dtype) {
         case Int8:
-          ret = API_LIB(depthwise_conv_intx_int8)((const int8_t *)input,
+          THINKER_RET_CHECK(API_LIB(depthwise_conv_intx_int8)((const int8_t *)input,
                                               (int8_t *)weight, (int32_t *)bias,
-                                              (int8_t *)output, conv_attrs, 4);
+                                              (int8_t *)output, conv_attrs, 4), "luna_depthwise_conv_intx_int8");
           break;
         case Int16:
-          ret = API_LIB(depthwise_conv_intx_int16)(
+          THINKER_RET_CHECK(API_LIB(depthwise_conv_intx_int16)(
               (const int8_t *)input, (int8_t *)weight, (int32_t *)bias,
-              (int16_t *)output, conv_attrs, 4);
+              (int16_t *)output, conv_attrs, 4), "luna_depthwise_conv_intx_int16");
           break;
         case Int32:
-          ret = API_LIB(depthwise_conv_intx_int32)(
+          THINKER_RET_CHECK(API_LIB(depthwise_conv_intx_int32)(
               (const int8_t *)input, (int8_t *)weight, (int32_t *)bias,
-              (int32_t *)output, conv_attrs, 4);
+              (int32_t *)output, conv_attrs, 4), "luna_depthwise_conv_intx_int32");
           break;
       }
       break;
     case Int8:
       switch (y_dtype) {
         case Int8:
-          ret = API_LIB(depthwise_conv_q7_int8)((const int8_t *)input,
+          THINKER_RET_CHECK(API_LIB(depthwise_conv_q7_int8)((const int8_t *)input,
                                             (int8_t *)weight, (int32_t *)bias,
-                                            (int8_t *)output, conv_attrs);
+                                            (int8_t *)output, conv_attrs), "luna_depthwise_conv_q7_int8");
           break;
         case Int16:
-          ret = API_LIB(depthwise_conv_q7_int16)((const int8_t *)input,
+          THINKER_RET_CHECK(API_LIB(depthwise_conv_q7_int16)((const int8_t *)input,
                                              (int8_t *)weight, (int32_t *)bias,
-                                             (int16_t *)output, conv_attrs);
+                                             (int16_t *)output, conv_attrs), "luna_depthwise_conv_q7_int16");
           break;
         case Int32:
-          ret = API_LIB(depthwise_conv_q7_int32)((const int8_t *)input,
+          THINKER_RET_CHECK(API_LIB(depthwise_conv_q7_int32)((const int8_t *)input,
                                              (int8_t *)weight, (int32_t *)bias,
-                                             (int32_t *)output, conv_attrs);
+                                             (int32_t *)output, conv_attrs), "luna_depthwise_conv_q7_int32");
           break;
       }
       break;
   }
-  return ret;
+  return T_SUCCESS;
 }
 
 static int32_t calc_split_cnn_luna(int32_t w_dtype, int32_t y_dtype,
                                    int8_t *input, int8_t *weight, int32_t *bias,
                                    void *output, s_conv_struct *conv_attrs) {
-  int32_t ret = 0;
-
   switch (w_dtype) {
     case Int8:
       switch (y_dtype) {
         case Int8:
-          ret = API_LIB(conv_split_q7_int8)((const int8_t *)input, (int8_t *)weight,
+          THINKER_RET_CHECK(API_LIB(conv_split_q7_int8)((const int8_t *)input, (int8_t *)weight,
                                         (int32_t *)bias, (int8_t *)output,
-                                        conv_attrs);
+                                        conv_attrs), "luna_conv_split_q7_int8");
           break;
         case Int16:
-          ret = API_LIB(conv_split_q7_int16)((const int8_t *)input,
+          THINKER_RET_CHECK(API_LIB(conv_split_q7_int16)((const int8_t *)input,
                                          (int8_t *)weight, (int32_t *)bias,
-                                         (int16_t *)output, conv_attrs);
+                                         (int16_t *)output, conv_attrs), "luna_conv_split_q7_int16");
           break;
         case Int32:
-          ret = API_LIB(conv_split_q7_int32)((const int8_t *)input,
+          THINKER_RET_CHECK(API_LIB(conv_split_q7_int32)((const int8_t *)input,
                                          (int8_t *)weight, (int32_t *)bias,
-                                         (int32_t *)output, conv_attrs);
+                                         (int32_t *)output, conv_attrs), "luna_conv_split_q7_int32");
           break;
       }
       break;
   }
 
-  return ret;
+  return T_SUCCESS;
 }
 
 static void conv1dint_para_init(Conv1dIntAttrs *attrs,
@@ -232,8 +226,6 @@ static void conv1dint_para_init(Conv1dIntAttrs *attrs,
 
 int32_t conv1dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y,
                         tTensor *Temp, Conv1dIntAttrs *attrs) {
-  int32_t ret = T_ERR_FAIL;
-
   uint64_t paddr_b = 0;
   int32_t has_bias = 0;
   int32_t bias_idx = 0;
@@ -274,7 +266,7 @@ int32_t conv1dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y,
     input_condition = (input_condition <= 64 * 1024) ? 1 : 0;
 
     if (!ou_c || !ou_h || !ou_w) {
-      return ret;
+      return T_ERR_INVALID_PARA;
     }
 
     if (1 == attrs->group) {                      // conv
@@ -286,8 +278,8 @@ int32_t conv1dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y,
           int8_t *p_weight = (int8_t *)W->dptr_;
           int32_t *p_bias = (0 == paddr_b) ? NULL : ((int32_t *)paddr_b);
           int8_t *p_out = (int8_t *)Y->dptr_ + n * ou_batch_size;
-          ret = calc_conv_luna(W->dtype_, Y->dtype_, p_in, p_weight, p_bias,
-                              (void *)p_out, &conv_attrs);
+          THINKER_RET_CHECK(calc_conv_luna(W->dtype_, Y->dtype_, p_in, p_weight, p_bias,
+                              (void *)p_out, &conv_attrs), "calc_conv_luna");
         }
       } 
       else if (input_condition && !kernel_condition) {  // split weight N
@@ -316,8 +308,8 @@ int32_t conv1dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y,
             if ((ou_c != k_n) && (i == (split_num - 1))) {
               conv_attrs.output_c = tmp_ou_c - (k_n - ou_c);
             }
-            ret = calc_conv_luna(W->dtype_, Y->dtype_, p_in_tmp, p_weight_tmp,
-                                p_bias_tmp, (void *)p_out_tmp, &conv_attrs);
+            THINKER_RET_CHECK(calc_conv_luna(W->dtype_, Y->dtype_, p_in_tmp, p_weight_tmp,
+                                p_bias_tmp, (void *)p_out_tmp, &conv_attrs), "calc_conv_luna");
           }
         }
       } else if (!input_condition && kernel_condition) {  // split input H/W
@@ -405,8 +397,8 @@ int32_t conv1dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y,
               for (c = 0; c < in_c; c++) {
                 memcpy(p_tmp + c * o_offset, p_in_tmp + c * i_offset, o_offset);
               }
-              ret = calc_conv_luna(W->dtype_, Y->dtype_, p_tmp, p_weight, p_bias,
-                                  (void *)p_tmp, &conv_attrs);
+              THINKER_RET_CHECK(calc_conv_luna(W->dtype_, Y->dtype_, p_tmp, p_weight, p_bias,
+                                  (void *)p_tmp, &conv_attrs), "calc_conv_luna");
 
               int32_t one_channel_ou_offset = ou_w * tmp_ou_h * (0xF & Y->dtype_);
               for (j = 0; j < ou_c; j++) {
@@ -425,8 +417,8 @@ int32_t conv1dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y,
             int8_t *p_out = (int8_t *)Y->dptr_ + n * ou_batch_size;
             int8_t *p_weight = (int8_t *)W->dptr_;
             int32_t *p_bias = (0 == paddr_b) ? NULL : ((int32_t *)paddr_b);
-            ret = calc_split_cnn_luna(W->dtype_, Y->dtype_, p_in, p_weight,
-                                      p_bias, (void *)p_out, &conv_attrs);
+            THINKER_RET_CHECK(calc_split_cnn_luna(W->dtype_, Y->dtype_, p_in, p_weight,
+                                      p_bias, (void *)p_out, &conv_attrs), "calc_split_cnn_luna");
           }
         }
       }
@@ -442,8 +434,8 @@ int32_t conv1dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y,
           int8_t *p_weight = (int8_t *)W->dptr_;
           int32_t *p_bias = (0 == paddr_b) ? NULL : ((int32_t *)paddr_b);
           int8_t *p_out = (int8_t *)Y->dptr_ + n * ou_batch_size;
-          ret = calc_depthwise_luna(W->dtype_, Y->dtype_, p_in, p_weight, p_bias,
-                                    (void *)p_out, &conv_attrs);
+          THINKER_RET_CHECK(calc_depthwise_luna(W->dtype_, Y->dtype_, p_in, p_weight, p_bias,
+                                    (void *)p_out, &conv_attrs), "calc_depthwise_luna");
         }
       } else if (!input_condition && kernel_condition) {  // split input H/W
         /////only support H
@@ -529,8 +521,8 @@ int32_t conv1dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y,
             for (c = 0; c < in_c; c++) {
               memcpy(p_tmp + c * o_offset, p_in_tmp + c * i_offset, o_offset);
             }
-            ret = calc_depthwise_luna(W->dtype_, Y->dtype_, p_tmp, p_weight,
-                                      p_bias, (void *)p_out_tmp, &conv_attrs);
+            THINKER_RET_CHECK(calc_depthwise_luna(W->dtype_, Y->dtype_, p_tmp, p_weight,
+                                      p_bias, (void *)p_out_tmp, &conv_attrs), "calc_depthwise_luna");
           }
 
           int32_t one_channel_ou_offset = ou_w * tmp_ou_h * (0xF & Y->dtype_);
@@ -576,8 +568,8 @@ int32_t conv1dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y,
             int8_t *p_out_tmp = p_out + i * step_data_out;
             int8_t *p_weight_tmp = p_weight + i * step_weight;
             int32_t *p_bias_tmp = p_bias + i * step_bias;
-            ret = calc_conv_luna(W->dtype_, Y->dtype_, p_in_tmp, p_weight_tmp,
-                                p_bias_tmp, (void *)p_out_tmp, &conv_attrs);
+            THINKER_RET_CHECK(calc_conv_luna(W->dtype_, Y->dtype_, p_in_tmp, p_weight_tmp,
+                                p_bias_tmp, (void *)p_out_tmp, &conv_attrs), "calc_conv_luna");
           }
         }
       } else if (!input_condition && kernel_condition) {  // split input H/W
@@ -678,8 +670,8 @@ int32_t conv1dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y,
               for (c = 0; c < in_c; c++) {
                 memcpy(p_tmp + c * o_offset, p_in_tmp + c * i_offset, o_offset);
               }
-              ret = calc_conv_luna(W->dtype_, Y->dtype_, p_tmp, p_weight_group,
-                                  p_bias_group, (void *)p_out_tmp, &conv_attrs);
+              THINKER_RET_CHECK(calc_conv_luna(W->dtype_, Y->dtype_, p_tmp, p_weight_group,
+                                  p_bias_group, (void *)p_out_tmp, &conv_attrs), "calc_conv_luna");
             }
 
             int32_t one_channel_ou_offset = ou_w * tmp_ou_h * (0xF & Y->dtype_);
@@ -782,13 +774,13 @@ int32_t conv1dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y,
             luna_mat_mul_api = (CONV1D_MAT_MUL_LUNA_API)conv1d_luna_api_list[0][bias_idx].luna_api;
             CONV1D_VEC_ADD_LUNA_API luna_add_api =
                   (CONV1D_VEC_ADD_LUNA_API)conv1d_luna_api_list[2 + bias_idx][ou_idx].luna_api;
-            ret = luna_mat_mul_api(p_tmp_in, p_weight, p_out_tmp, split_M, N, L, 0);
+            THINKER_RET_CHECK(luna_mat_mul_api(p_tmp_in, p_weight, p_out_tmp, split_M, N, L, 0), "luna_mat_mul_api");
             for(int32_t j = 0; j < split_M; j++)
-              ret |= luna_add_api(p_out_tmp + j * L, (void *)paddr_b, p_tmp_ou + j * L, L, shift);
+              THINKER_RET_CHECK(luna_add_api(p_out_tmp + j * L, (void *)paddr_b, p_tmp_ou + j * L, L, shift), "luna_add_api");
           } 
           else {
             luna_mat_mul_api = (CONV1D_MAT_MUL_LUNA_API)conv1d_luna_api_list[0][ou_idx].luna_api;
-            ret = luna_mat_mul_api(p_tmp_in, p_weight, p_tmp_ou, split_M, N, L, shift);
+            THINKER_RET_CHECK(luna_mat_mul_api(p_tmp_in, p_weight, p_tmp_ou, split_M, N, L, shift), "luna_mat_mul_api");
           }
         }
       }
@@ -829,22 +821,22 @@ int32_t conv1dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y,
           int32_t *p_tmp = (int32_t *)((int8_t *)Temp->dptr_ + temp_size);
           temp_size += M * L * 4; //sizeof(int32_t)
           if (temp_size > workspace_size)
-            return -1;
+            return T_ERR_NO_WORKSPACE;
           luna_mat_mul_api =
               (CONV1D_MAT_MUL_LUNA_API)conv1d_luna_api_list[0][bias_idx].luna_api;
-          ret = luna_mat_mul_api(p_tmp_in, p_weight, p_tmp, M, N, L, 0);
+          THINKER_RET_CHECK(luna_mat_mul_api(p_tmp_in, p_weight, p_tmp, M, N, L, 0), "luna_mat_mul_api");
           for (int32_t i = 0; i < M; i++)  // add bias
           {
             CONV1D_VEC_ADD_LUNA_API luna_add_api =
                 (CONV1D_VEC_ADD_LUNA_API)conv1d_luna_api_list[2 + bias_idx][ou_idx].luna_api;
             int8_t *tsrc1 = (int8_t *)p_tmp + i * L * (Bias->dtype_ & 0xF);
             int8_t *tdst = (int8_t *)p_tmp_ou + i * L * (Y->dtype_ & 0xF);
-            ret |= luna_add_api(tsrc1, (void *)paddr_b, tdst, L, shift);
+            THINKER_RET_CHECK(luna_add_api(tsrc1, (void *)paddr_b, tdst, L, shift), "luna_add_api");
           }
         } else {
           luna_mat_mul_api =
               (CONV1D_MAT_MUL_LUNA_API)conv1d_luna_api_list[0][ou_idx].luna_api;
-          ret = luna_mat_mul_api(p_tmp_in, p_weight, p_tmp_ou, M, N, L, shift);
+          THINKER_RET_CHECK(luna_mat_mul_api(p_tmp_in, p_weight, p_tmp_ou, M, N, L, shift), "luna_mat_mul_api");
         }
       }
       else { // big martrix split on col
@@ -864,27 +856,27 @@ int32_t conv1dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y,
             int32_t *p_tmp = (int32_t *)((int8_t *)Temp->dptr_ + temp_size);
             temp_size += M * L * 4; //sizeof(int32_t)
             if (temp_size > workspace_size)
-              return -1;
+              return T_ERR_NO_WORKSPACE;
             luna_mat_mul_api = (CONV1D_SPLIT_MAT_MUL_LUNA_API)conv1d_luna_api_list[1][bias_idx].luna_api;
-            ret = luna_mat_mul_api(p_tmp_in, p_weight, p_tmp, split_num, M, N, L, 0);
+            THINKER_RET_CHECK(luna_mat_mul_api(p_tmp_in, p_weight, p_tmp, split_num, M, N, L, 0), "luna_mat_mul_api");
             for (int32_t i = 0; i < M; i++)  // add bias
             {
               CONV1D_VEC_ADD_LUNA_API luna_add_api =
                   (CONV1D_VEC_ADD_LUNA_API)conv1d_luna_api_list[2 + bias_idx][ou_idx].luna_api;
               int8_t *tsrc1 = (int8_t *)p_tmp + i * L * (Bias->dtype_ & 0xF);
               int8_t *tdst = (int8_t *)p_tmp_ou + i * L * (Y->dtype_ & 0xF);
-              ret |= luna_add_api(tsrc1, (void *)paddr_b, tdst, L, shift);
+              THINKER_RET_CHECK(luna_add_api(tsrc1, (void *)paddr_b, tdst, L, shift), "luna_add_api");
             }
           } else {
             luna_mat_mul_api =
                 (CONV1D_SPLIT_MAT_MUL_LUNA_API)conv1d_luna_api_list[1][ou_idx].luna_api;
-            ret = luna_mat_mul_api(p_tmp_in, p_weight, p_tmp_ou, split_num, M, N, L, shift);
+            THINKER_RET_CHECK(luna_mat_mul_api(p_tmp_in, p_weight, p_tmp_ou, split_num, M, N, L, shift), "luna_mat_mul_api");
           }
         }
       }      
     }
-    API_LIB(mat_trans_q7)(p_out, p_out, M, L);
+    THINKER_RET_CHECK(API_LIB(mat_trans_q7)(p_out, p_out, M, L), "luna_mat_trans_q7");
   }
-  return ret;
+  return T_SUCCESS;
 }
 #endif  //_CONV1DINT_VENUS_H_

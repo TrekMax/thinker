@@ -25,9 +25,7 @@
  * @param workspace Workspace buffer
  * @return Operation status
  */
-int32_t batchnormint_luna(const tTensor *X, const tTensor *W, const tTensor *Bias, tTensor *Y, tTensor *workspace) {
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
-    
+int32_t batchnormint_luna(const tTensor *X, const tTensor *W, const tTensor *Bias, tTensor *Y, tTensor *workspace) {   
     int32_t N = X->shape_.dims_[0];  // Batch size
     int32_t F = X->shape_.dims_[2] * X->shape_.dims_[3];  // Channels per feature map
     int32_t C = X->shape_.dims_[1];  // Number of channels
@@ -53,12 +51,12 @@ int32_t batchnormint_luna(const tTensor *X, const tTensor *W, const tTensor *Bia
             int8_t *p_ou = p_dst + i * one_batch_size + j * F;  // Output pointer for current channel
             
             // Apply scale and bias
-            ret = API_LIB(scale_q7_int32)(p_in, w_val, p_tmp, F, 0);  // Scale input
-            ret = API_LIB(offset_q31_int8)(p_tmp, b_val, p_ou, F, shift);  // Apply bias and shift
+            THINKER_RET_CHECK(API_LIB(scale_q7_int32)(p_in, w_val, p_tmp, F, 0), "luna_scale_q7_int32");  // Scale input
+            THINKER_RET_CHECK(API_LIB(offset_q31_int8)(p_tmp, b_val, p_ou, F, shift), "luna_offset_q31_int8");  // Apply bias and shift
         }
     }
     
-    return ret;
+    return T_SUCCESS;
 }
 
 #endif  //_BATCHNORMINT_VENUS_H_

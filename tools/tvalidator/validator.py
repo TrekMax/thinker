@@ -108,7 +108,8 @@ class Validator:
 
         for idx, node in enumerate(self.model.graph.node):
             for out in node.output:
-                tensor_topo_order[out] = idx
+                tensor_name = out.replace("/", "_")
+                tensor_topo_order[tensor_name] = idx
 
         def get_prefix_from_filename(filename: str) -> str:
             return filename.split("##", 1)[0]
@@ -279,20 +280,26 @@ class ThinkerValidator:
                 "-DTHINKER_RESULT_DUMP=ON",
                 "-DTHINKER_RESULT_CRC_PRINT=OFF",
                 "-DTHINKER_RESOURC_CRC_CHECK=OFF",
-                ".."
+                "-DTHINKER_USE_MOSS=OFF",
+                "-DTHINKER_CHECK_PLATFORM=OFF"
             ]
 
             if self.platform == "arcs":
                 cmake_cmd.append("-DTHINKER_USE_VENUS=OFF")
+                cmake_cmd.append("-DTHINKER_USE_VENUSA=OFF")
                 cmake_cmd.append("-DTHINKER_USE_ARCS=ON")
             elif self.platform == "venusA":
                 cmake_cmd.append("-DTHINKER_USE_VENUS=OFF")
+                cmake_cmd.append("-DTHINKER_USE_ARCS=OFF")
                 cmake_cmd.append("-DTHINKER_USE_VENUSA=ON")
             elif self.platform == "venus":
-                pass
+                cmake_cmd.append("-DTHINKER_USE_VENUS=ON")
+                cmake_cmd.append("-DTHINKER_USE_ARCS=OFF")
+                cmake_cmd.append("-DTHINKER_USE_VENUSA=OFF")
             else:
                 raise RuntimeError(f"Unsupported platform: <{self.platform}>")
-
+            
+            cmake_cmd.append("..")
             subprocess.run(cmake_cmd, check=True)
             subprocess.run(["make", "-j16"], check=True)
 
@@ -385,7 +392,11 @@ def main():
     parser.add_argument('--cfg', type=str, default=None, help='Dynamic config in key=value format')
     
     args = parser.parse_args()
+
     dynamic_cfg = parse_dynamic_cfg(args.cfg)
+    if len(dynamic_cfg) == 0:
+        dynamic_cfg = None
+
     inputs: List[np.ndarray] = None
     if args.input_path is not None:
         inputs = []

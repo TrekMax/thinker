@@ -30,13 +30,12 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     CHECK_EQ(num_tensor, (op->num_input_ + op->num_output_));  // Validate tensor count
 
     SliceAttrs *attr = (SliceAttrs *)((int8_t *)op + op->attr_offset_);
-    int32_t ret = T_ERR_NO_IMPLEMENTED;
 
 #if THINKER_USE_VENUS || THINKER_USE_ARCS || THINKER_USE_VENUSA
-    ret = split_venus(tensors[0], tensors, attr);  // Execute split operation
+    THINKER_RET_CHECK(split_venus(tensors[0], tensors, attr), "split_venus");  // Execute split operation
 #endif
 
-    return ret;
+    return T_SUCCESS;
 }
 
 #include "core/operator_template.h"
