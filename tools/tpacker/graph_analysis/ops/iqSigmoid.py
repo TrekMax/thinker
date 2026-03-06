@@ -17,7 +17,12 @@ class iqSigmoid(Operator):
 
         X = inputs[0]
         if platform == "venus":
-            assert X.dtype == np.int16, "input data type of iqSigmoid must be int16"
+            assert X.dtype == np.int16, "input data type of iqSigmoid must be int16 for venus"
+        elif platform == "arcs":
+            assert X.dtype == np.int8, "input data type of iqSigmoid must be int16 for arcs"
+        elif platform == 'venuA':
+            assert X.dtype in {np.int8, np.int16, np.int32}, "input data type of iqSigmoid must be int8/int16/int32 for venusA"
+
         # Process input scale
         scale_x = self.attrs.get("scale_x")
         temp = math.log(scale_x, 2)
@@ -29,25 +34,39 @@ class iqSigmoid(Operator):
         temp = math.log(scale_o, 2)
         assert abs(temp - int(temp)) < 0.000001, "Scale must be a power of 2"
 
+        out_bits = self.attrs.get('o_bits')
+        if out_bits != None:
+            assert out_bits == 8, "output type must be int8"
+
         # Create output tensor
         Y = X.clone(scale=int(temp), dtype=np.int8, bits=1)
         self.outputs = [Y]
 
-        # Perform forward computation if all inputs have data
-        if all(x.has_data() for x in inputs):
-            self.forward()
-
     def get_workspace(self) -> List[Tensor]:
         """Calculate the required workspace for the iqSigmoid operation."""
-        x = self.inputs[0]
+        X = self.inputs[0]
+        Y = self.outputs[0]
+        data_size = np.prod(X.shape)
         platform = self.attrs.get("platform", "venus")
+        assert Y.mem_type == MemType.SHARE_MEM, "output mem_type of iqSigmoid must be share memory"
 
         workspace_size = 0
-        if platform in {"arcs", "venusA"}:
-            workspace_size = x.nbytes * 4
-        elif platform == "venus":
-            assert x.mem_type == MemType.SHARE_MEM and self.outputs[0].mem_type == MemType.SHARE_MEM
-            workspace_size = x.nbytes * 2 if x.scale != 11 else 0
+        if platform == "venus":
+            assert X.mem_type == MemType.SHARE_MEM, "input mem_type of iqSigmoid must be share memory"
+            workspace_size = data_size * 2 if X.scale != 11 else 0
+        elif platform == "arcs":
+            assert X.mem_type == MemType.SHARE_MEM, "input mem_type of iqSigmoid must be share memory"
+            workspace_size = data_size * 4
+        elif platform == "venusA":
+            if X.dtype == np.int8:
+                workspace_size = data_size * 6
+            elif X.dtype == np.int16:
+                workspace_size = data_size * 4
+            elif X.dtype == np.int32:
+                if X.scale != 27:
+                    workspace_size =  data_size * 4
+                else:
+                    workspace_size = 0
 
         if workspace_size != 0:
             return [Tensor.from_shape([workspace_size], np.int8, MemType.SHARE_MEM)]

@@ -108,10 +108,10 @@ class LSTMInt(Operator):
         assert len(X.shape) == 3, "Input must be a 3D tensor"
 
         # Determine output shape based on layout
-        if self.attrs["layout"] == 0:
+        if self.attrs["layout"] == 1:
             T = X.shape[1]
         else:
-            T = X.shape[2]
+            T = X.shape[0]
 
         hidden_size = self.attrs["hidden_size"]
         yshape = [1, T, hidden_size]

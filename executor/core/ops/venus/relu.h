@@ -23,7 +23,7 @@
  * @param shift Shift value
  * @return int32_t Operation status
  */
-static int32_t calc_relu_luna(int32_t X_dtype, int32_t Y_dtype, const void *src, void *dst, uint32_t size, int32_t shift) {
+static int32_t calc_relu_luna(const void *src, void *dst, int32_t X_dtype, int32_t Y_dtype, uint32_t size, int32_t shift) {
     switch (X_dtype) {
         case Int8: {
             switch (Y_dtype) {
@@ -58,7 +58,7 @@ static int32_t calc_relu_luna(int32_t X_dtype, int32_t Y_dtype, const void *src,
  * @return tStatus Operation status
  */
 tStatus relu_luna(tTensor *X, tTensor *Y, tTensor *Workspace) {
-    int32_t shift = 0;
+    int32_t shift = Y->scale_ - X->scale_;
     void *src = (void *)X->dptr_;
     void *dst = (void *)Y->dptr_;
     void *tmp_buf = NULL;
@@ -70,12 +70,15 @@ tStatus relu_luna(tTensor *X, tTensor *Y, tTensor *Workspace) {
     }
 
     uint32_t size = getTensorSize(X);
-
     // If input is in PSRAM, process in chunks
-    if (X->mem_.type_ != 2) {
-        if (X->dtype_ != Int8 || Y->dtype_ != Int8) {
-            return T_ERR_INVALID_DATATYPE;
-        }
+    if ((X->mem_.type_ != 2) || (Y->mem_.type_ != 2)) {
+#ifdef RUNTIME_PARAM_CHECK
+    /*Check the storage locations for input and output, 
+    as it is unnecessary because they have already been limited in tpacker.*/
+    if (X->dtype_ != Int8 || Y->dtype_ != Int8) {
+        return T_ERR_INVALID_DATATYPE;
+    }
+#endif
 
         int32_t split_num = 1;
         int32_t split_size = size;
@@ -92,14 +95,21 @@ tStatus relu_luna(tTensor *X, tTensor *Y, tTensor *Workspace) {
             if (i == split_num - 1) {
                 split_size = final_split_size;
             }
-
-            memcpy(tmp_buf, p_in, split_size);
-            THINKER_RET_CHECK(calc_relu_luna(Int8, Int8, tmp_buf, tmp_buf, split_size, shift), "calc_relu_luna");
-            memcpy(p_out, tmp_buf, split_size);
+            if (X->mem_.type_ != 2) {
+                memcpy(tmp_buf, p_in, split_size);
+                p_in = tmp_buf;
+            }
+            if (Y->mem_.type_ != 2) {
+                p_out = tmp_buf;
+            }
+            THINKER_RET_CHECK(calc_relu_luna(p_in, p_out, Int8, Int8, split_size, shift), "calc_relu_luna");
+            if (Y->mem_.type_ != 2) {
+                memcpy((int8_t *)dst + i * split_size, p_out, split_size);
+            }
         }
-    } 
+    }
     else {
-        return calc_relu_luna(X->dtype_, Y->dtype_, src, dst, size, shift);
+        return calc_relu_luna(src, dst, X->dtype_, Y->dtype_, size, shift);
     }
 
     return T_SUCCESS;

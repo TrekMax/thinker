@@ -22,10 +22,6 @@ class PoolAttrs(OperatorAttrs):
 
         ceil = CeilMode.from_int(self.attrs.get("ceil_mode", 0))
 
-        strides = attr2tuple(self.attrs.get("strides"), (1, 1))
-        assert strides[0] in {1, 2, 4}, "Stride width exceeds limit"
-        assert strides[1] in {1, 2, 4}, "Stride height exceeds limit"
-
         layout = Layout.from_str(Layout, self.attrs.get("layout", "NCHW"))
         assert layout in {Layout.NCHW, Layout.NHWC}, "Invalid layout for Pool operation"
 
@@ -85,6 +81,8 @@ class MaxPool(Operator, PoolLayout):
                 assert 0 <= pads[2] <= 11, "pad_right for Conv2dInt exceed limit"
                 assert 0 <= pads[3] <= 11, "pad_down for Conv2dInt exceed limit"
 
+            assert strides[0] in {1, 2, 4}, "Stride width exceeds limit"
+            assert strides[1] in {1, 2, 4}, "Stride height exceeds limit"
             assert (kernels[0] >= strides[0] and kernels[1] >= strides[1]), "Kernel size must be >= stride size"
             assert (pads[0] <= kernels[0] and pads[2] <= kernels[0]), "Pad width exceeds kernel width"
             assert (pads[1] <= kernels[1] and pads[3] <= kernels[1]), "Pad height exceeds kernel height"

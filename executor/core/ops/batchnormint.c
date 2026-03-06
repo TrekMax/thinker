@@ -28,23 +28,25 @@ int32_t X(Forward)(tOperator* op, tTensor** tensors, int32_t num_tensor, tDMA_Li
     tTensor* W = ((tTensor**)tensors)[1];     // Weight tensor
     tTensor* Bias = ((tTensor**)tensors)[2];  // Bias tensor
     tTensor* Y = ((tTensor**)tensors)[op->num_input_];  // Output tensor
-    
+
     // Check if any platform is enabled
-    #if THINKER_USE_VENUS || THINKER_USE_ARCS || THINKER_USE_VENUSA
-        #if THINKER_PROFILE
-        uint64_t start_t = tick_count();  // Record start time for profiling
-        #endif
-        
-        // Get workspace tensor and call platform-specific implementation
-        tTensor* workspace = ((tTensor**)tensors)[num_tensor - 1];
-        THINKER_RET_CHECK(batchnormint_luna(X, W, Bias, Y, workspace), "batchnormint_luna");
-        
-        #if THINKER_PROFILE
-        uint64_t finish_t = tick_count();  // Record end time for profiling
-        uint32_t total_t = (uint32_t)(finish_t - start_t);
-        printf("%8s | %u | (","batchNormInt", total_t);  
-        #endif
+#if THINKER_USE_VENUS || THINKER_USE_ARCS || THINKER_USE_VENUSA
+    #if THINKER_PROFILE
+    uint64_t start_t = tick_count();  // Record start time for profiling
     #endif
+    
+    // Get workspace tensor and call platform-specific implementation
+    tTensor *Workspace = NULL;
+    if (num_tensor > op->num_input_ + op->num_output_)
+        Workspace = tensors[op->num_input_ + op->num_output_];
+    THINKER_RET_CHECK(batchnormint_luna(X, W, Bias, Y, Workspace), "batchnormint_luna");
+
+    #if THINKER_PROFILE
+    uint64_t finish_t = tick_count();  // Record end time for profiling
+    uint32_t total_t = (uint32_t)(finish_t - start_t);
+    printf("%8s | %u | (","BatchNorm2dInt", total_t);  
+    #endif
+#endif
 
     return T_SUCCESS;  // Return result code
 }

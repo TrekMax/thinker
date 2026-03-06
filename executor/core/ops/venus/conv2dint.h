@@ -89,9 +89,12 @@ static int32_t calc_conv_luna(int32_t w_dtype, int32_t y_dtype, int8_t *input,
                                    (int32_t *)bias, (int32_t *)output,
                                    conv_attrs), "luna_conv_q7_int32");
           break;
+        default:
+          return T_ERR_INVALID_DATATYPE;
       }
-      default:
-        return T_ERR_INVALID_DATATYPE;
+      break;
+    default:
+      return T_ERR_INVALID_DATATYPE;
   }
 
   return T_SUCCESS;

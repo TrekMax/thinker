@@ -44,8 +44,6 @@ tStatus relux_luna(tTensor *X, tTensor *Y, ReluxAttrs *attrs) {
     // Execute ReLUX operation based on input data type
     if (X->dtype_ == Int8)
         THINKER_RET_CHECK(API_LIB(relux_i8o8)((int8_t *)X->dptr_, threshold, (int8_t *)Y->dptr_, size, shift), "luna_relux_i8o8");
-    else if (X->dtype_ == Int16)
-        THINKER_RET_CHECK(API_LIB(relux_i16o8)((int16_t *)X->dptr_, threshold, (int8_t *)Y->dptr_, size, shift), "luna_relux_i16o8");
     else if (X->dtype_ == Int32)
         THINKER_RET_CHECK(API_LIB(relux_i32o8)((int32_t *)X->dptr_, threshold, (int8_t *)Y->dptr_, size, shift), "luna_relux_i32o8");
     else

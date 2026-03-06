@@ -24,8 +24,11 @@
 int32_t iqsigmoid(tTensor *X, tTensor *Y, tTensor *Temp) {
     const int32_t Q_INPUT = 11;  // Input quantization bits
     const int32_t Q_OUTPUT = 7;  // Output quantization bits
-    
-#ifdef PARAM_CHECK
+    int32_t x_q = (int32_t)X->scale_;
+    int16_t *src = (int16_t *)X->dptr_;
+    int32_t shift = Q_INPUT - x_q;
+
+#ifdef RUNTIME_PARAM_CHECK
     /*Check the storage locations for input and output, 
     as it is unnecessary because they have already been limited in tpacker.*/
     if ((X->mem_.type_ != 2) && (Y->mem_.type_ != 2))
@@ -34,33 +37,33 @@ int32_t iqsigmoid(tTensor *X, tTensor *Y, tTensor *Temp) {
         return T_ERR_INVALID_DATATYPE;
     }
 #endif
-
-    int32_t x_q = (int32_t)X->scale_;
-    int16_t *src = (int16_t *)X->dptr_;
-    int32_t shift = x_q - Q_INPUT;
     
     uint32_t input_size = getTensorSize(X);
     uint32_t workspace_size = Temp ? Temp->shape_.dims_[0] : 0;
 
-    if (shift > 0) {
-#ifdef PARAM_CHECK        
+    if (shift != 0) {
+#ifdef RUNTIME_PARAM_CHECK        
         if (workspace_size < input_size * 2) {
             return T_ERR_NO_WORKSPACE;
         }
 #endif
         int16_t *dst_temp = (int16_t *)Temp->dptr_;
-        THINKER_RET_CHECK(API_LIB(scale_q15_int16)(src, 1, dst_temp, input_size, x_q - Q_INPUT), "luna_scale_q15_int16");
+        uint32_t shift1 = shift > 0 ? shift : 0;
+        uint32_t shift2 = shift > 0 ? 0 : -shift;
+        THINKER_RET_CHECK(API_LIB(scale_q15_int16)(src, 1UL << shift1, dst_temp, input_size, shift2), "luna_scale_q15_int16");
         
         if (Y->dtype_ == Int8) {
             THINKER_RET_CHECK(API_LIB(sigmoid_int8)(dst_temp, (int8_t *)Y->dptr_, input_size), "luna_sigmoid_int8");
-        } else {
+        } 
+        else {
             THINKER_RET_CHECK(API_LIB(sigmoid)(dst_temp, (int16_t *)Y->dptr_, input_size), "luna_sigmoid");
         }
     } 
     else {
         if (Y->dtype_ == Int8) {
             THINKER_RET_CHECK(API_LIB(sigmoid_int8)(src, (int8_t *)Y->dptr_, input_size), "luna_sigmoid_int8");
-        } else {
+        } 
+        else {
             THINKER_RET_CHECK(API_LIB(sigmoid)(src, (int16_t *)Y->dptr_, input_size), "luna_sigmoid");
         }
     }

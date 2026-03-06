@@ -26,15 +26,28 @@
 int32_t batchnormint_luna(const tTensor *X, const tTensor *W, const tTensor *Bias, tTensor *Y, tTensor *workspace) {
    
     int32_t N = X->shape_.dims_[0];    // Number of batches
-    int32_t F = X->shape_.dims_[2] * X->shape_.dims_[3];    // Features per channel
     int32_t C = X->shape_.dims_[1];    // Number of channels
+    int32_t F = X->shape_.dims_[2] * X->shape_.dims_[3];    // Features per channel
     int32_t one_batch_size = F * C;    // Size of one batch
+
+#ifdef RUNTIME_PARAM_CHECK
+    /*Check the storage locations for input and output, 
+    as it is unnecessary because they have already been limited in tpacker.*/
+    if (Y->mem_.type_ != 2)
+        return T_ERR_INVALID_DATATYPE;
+    if ((X->dtype_ != Int8) || (Y->dtype_ != Int8)) {
+        return T_ERR_INVALID_DATATYPE;
+    }
+    int32_t workspace_size = workspace ? workspace->shape_.dims_[0] : 0; 
+    if (workspace_size < F * 4)
+        return T_ERR_NO_WORKSPACE;
+#endif
 
     int8_t *p_src = (int8_t *)X->dptr_;    // Input data pointer
     int8_t *p_dst = (int8_t *)Y->dptr_;    // Output data pointer
     int8_t *p_weight = (int8_t *)W->dptr_;    // Weight data pointer (gamma)
     int32_t *p_bias = (int32_t *)Bias->dptr_;    // Bias data pointer (beta)
-    int32_t *p_tmp = (int32_t *)workspace->dptr_;    // Temporary workspace pointer
+    int32_t *p_tmp = workspace ? (int32_t *)workspace->dptr_ : NULL;  // Pointer to temporary workspace
 
     int32_t q_x = (int32_t)X->scale_;    // Input scale factor
     int32_t q_w = (int32_t)W->scale_;    // Weight scale factor

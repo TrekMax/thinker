@@ -1,0 +1,18 @@
+Metadata-Version: 2.4
+Name: thinker
+Version: 3.0.5
+Summary: A DeepLearning inference framework for venus
+Home-page: https://git-in.iflytek.com/RS_RDG_AI_Group/bitbrain/thinker
+Author: thinker
+Author-email: leifang@listenai.com
+Classifier: Operating System :: OS Independent
+Classifier: Intended Audience :: Developers and Researchers
+Classifier: License :: OSI Approved :: Apache License
+Classifier: Programming Language :: Python
+Requires-Dist: onnx
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: home-page
+Dynamic: requires-dist
+Dynamic: summary

@@ -158,8 +158,6 @@ class Device(object):
                f"PSRAM Size: {self.psram_size} bytes\n" \
                f"DMA Support: {self.dma_support}\n" \
                f"DMA Channels: {self.dma_channels}\n" \
-               f"Max Operation Speed: {self.max_operation_speed} OPS\n" \
-               f"Memory Bandwidth: {self.memory_bandwidth} B/s\n" \
                f"Supported Operators: {', '.join(self.supported_operators)}\n" \
                f"Supported Precision: {', '.join(self.supported_precision)}"
 

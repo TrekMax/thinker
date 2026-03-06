@@ -62,7 +62,7 @@ def _graph_bind_device(graph: Graph, device: Device, dy_memory: Dict[str, Tuple[
 
     for node in graph.nodes.values():
         if node.op_type not in device.supported_operators:
-            raise ImportError(f"platform:{platform} do not support {node.op_type}!")
+            raise ImportError(f"platform:{device._name} do not support {node.op_type}!")
 
         for i in range(len(node.inputs)):
             data_size = np.prod(node.inputs[i].tensor.shape) * node.inputs[i].tensor.bits

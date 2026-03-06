@@ -16,107 +16,93 @@
 #include "thinker_status.h"
 
 /**
- * @brief ReLU activation function implementation for various data types
+ * @brief Calculate ReLU activation for different data types
+ * @param X_dtype Input data type
+ * @param Y_dtype Output data type
+ * @param src Input data pointer
+ * @param dst Output data pointer
+ * @param size Size of data
+ * @param shift Shift value
+ * @return int32_t Operation status
+ */
+static int32_t calc_relu_luna(const void *src, void *dst, int32_t X_dtype, int32_t Y_dtype, uint32_t size, int32_t shift) {
+    switch (X_dtype) {
+        case Int8: {
+            switch (Y_dtype) {
+                case Int8:  return API_LIB(relu_i8o8)((const int8_t *)src, (int8_t *)dst, size, shift);
+                case Int32: return API_LIB(relu_i8o32)((const int8_t *)src, (int32_t *)dst, size, shift);
+            }
+        }
+        case Int32: {
+            switch (Y_dtype) {
+                case Int8:  return API_LIB(relu_i32o8)((const int32_t *)src, (int8_t *)dst, size, shift);
+                case Int32: return API_LIB(relu_i32o32)((const int32_t *)src, (int32_t *)dst, size, shift);
+            }
+        }
+    }
+    return T_ERR_INVALID_DATATYPE;
+}
+
+/**
+ * @brief Main ReLU function
  * @param X Input tensor
  * @param Y Output tensor
- * @param Workspace Workspace buffer
- * @return Operation result status
+ * @param Workspace Temporary workspace tensor (optional)
+ * @return tStatus Operation status
  */
 tStatus relu_luna(tTensor *X, tTensor *Y, tTensor *Workspace) {
-    uint32_t size = getShapeSize(&(X->shape_));
-    uint32_t workspace_size = Workspace ? getShapeSize(&(Workspace->shape_)) : 0;
-    
     int32_t shift = Y->scale_ - X->scale_;
-    
-    // Handle Int8 -> Int8 case
-    if (Int8 == X->dtype_ && Int8 == Y->dtype_) {
-        int8_t *src = (int8_t *)X->dptr_;
-        int8_t *dst = (int8_t *)Y->dptr_;
+    void *src = (void *)X->dptr_;
+    void *dst = (void *)Y->dptr_;
+    void *tmp_buf = NULL;
+    uint32_t tmp_size = 0;
 
-        // Handle PSRAM input
-        if (2 != X->mem_.type_) { // X is psram
-            THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)Workspace->dptr_, src, size), "luna_memcpy_i8o8");
-            if (size > workspace_size)
-                return T_ERR_NO_WORKSPACE;
-            src = (int8_t *)Workspace->dptr_;
-        }
-        
-        // Handle PSRAM output
-        if (2 != Y->mem_.type_) {
-            if (size > workspace_size)
-                return T_ERR_NO_WORKSPACE;
-            dst = (int8_t *)Workspace->dptr_;
-        }
-
-        THINKER_RET_CHECK(API_LIB(relu_i8o8)(src, dst, size, shift), "luna_relu_i8o8");
-        if (2 != Y->mem_.type_) {
-            opi_psram_cpy_out((int8_t *)Y->dptr_, dst, size);
-        }
+    if (Workspace != NULL) {
+        tmp_buf = (void *)Workspace->dptr_;
+        tmp_size = getTensorSize(Workspace);
     }
-    // Handle Int8 -> Int32 case
-    else if (Int8 == X->dtype_ && Int32 == Y->dtype_) {
-        int8_t *src = (int8_t *)X->dptr_;
-        int32_t *dst = (int32_t *)Y->dptr_;
 
-        if (2 != X->mem_.type_) { // X is psram
-            if (size > workspace_size)
-                return T_ERR_NO_WORKSPACE;
-            THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)Workspace->dptr_, src, size), "luna_memcpy_i8o8");
-            src = (int8_t *)Workspace->dptr_;
+    uint32_t size = getTensorSize(X);
+    // If input is in PSRAM, process in chunks
+    if ((X->mem_.type_ != 2) || (Y->mem_.type_ != 2)) {
+#ifdef RUNTIME_PARAM_CHECK
+        /*Check the storage locations for input and output, 
+        as it is unnecessary because they have already been limited in tpacker.*/
+        if (X->dtype_ != Int8 || Y->dtype_ != Int8) {
+            return T_ERR_INVALID_DATATYPE;
         }
-        
-        if (2 != Y->mem_.type_) {
-            if (size > workspace_size)
-                return T_ERR_NO_WORKSPACE;
-            dst = (int32_t *)Workspace->dptr_;
+#endif
+
+        int32_t split_num = 1;
+        int32_t split_size = size;
+        while (split_size > tmp_size) {
+            split_num++;
+            split_size = (size + split_num - 1) / split_num;
         }
-        
-        THINKER_RET_CHECK(API_LIB(relu_i8o32)(src, dst, size, shift), "luna_relu_i8o32");
 
-        if (2 != Y->mem_.type_) {
-            opi_psram_cpy_out((int8_t *)Y->dptr_, dst, size * 4);
-        }
-    }
-    // Handle Int32 -> Int8 case
-    else if (Int32 == X->dtype_ && Int8 == Y->dtype_) {
-        int32_t *src = (int32_t *)X->dptr_;
-        int8_t *dst = (int8_t *)Y->dptr_;
+        int32_t final_split_size = size - split_size * (split_num - 1);
+        for (int i = 0; i < split_num; i++) {
+            int8_t *p_in = (int8_t *)src + i * split_size;
+            int8_t *p_out = (int8_t *)dst + i * split_size;
 
-        if (2 != X->mem_.type_) { // X is psram
-            THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)Workspace->dptr_, (int8_t *)src, size * 4), "luna_memcpy_i8o8");
-            src = (int32_t *)Workspace->dptr_;
-        }
-        
-        if (2 != Y->mem_.type_)
-            dst = (int8_t *)Workspace->dptr_;
-
-        THINKER_RET_CHECK(API_LIB(relu_i32o8)(src, dst, size, shift), "luna_relu_i32o8");
-
-        if (2 != Y->mem_.type_) {
-            opi_psram_cpy_out((int8_t *)Y->dptr_, dst, size);
-        }
-    }
-    // Handle Int32 -> Int32 case
-    else if (Int32 == X->dtype_ && Int32 == Y->dtype_) {
-        int32_t *src = (int32_t *)X->dptr_;
-        int32_t *dst = (int32_t *)Y->dptr_;
-
-        if (2 != X->mem_.type_) { // X is psram
-            THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)Workspace->dptr_, (int8_t *)src, size * 4), "luna_memcpy_i8o8");
-            src = (int32_t *)Workspace->dptr_;
-        }
-        
-        if (2 != Y->mem_.type_)
-            dst = (int32_t *)Workspace->dptr_;
-
-        THINKER_RET_CHECK(API_LIB(relu_i32o32)(src, dst, size, shift), "luna_relu_i32o32");
-
-        if (2 != Y->mem_.type_) {
-            opi_psram_cpy_out((int8_t *)Y->dptr_, dst, size * 4);
+            if (i == split_num - 1) {
+                split_size = final_split_size;
+            }
+            if (X->mem_.type_ != 2) {
+                 THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(tmp_buf, p_in, split_size), "luna_memcpy_i8o8");
+                p_in = tmp_buf;
+            }
+            if (Y->mem_.type_ != 2) {
+                p_out = tmp_buf;
+            }
+            THINKER_RET_CHECK(calc_relu_luna(p_in, p_out, Int8, Int8, split_size, shift), "calc_relu_luna");
+            if (Y->mem_.type_ != 2) {
+                opi_psram_cpy_out((int8_t *)dst + i * split_size, p_out, split_size);
+            }
         }
     }
     else {
-        return T_ERR_INVALID_DATATYPE;
+        return calc_relu_luna(src, dst, X->dtype_, Y->dtype_, size, shift);
     }
 
     return T_SUCCESS;

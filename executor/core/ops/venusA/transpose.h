@@ -60,9 +60,9 @@ int32_t transpose_luna(tTensor *X, tTensor *Y, tTensor * workspace, uint32_t dim
                     }
 
                     for (int32_t i = 0; i < batch; i++) {
-                        int8_t *src = (int8_t *)src + i * one_batch_size;
-                        int8_t *dst = (int8_t *)dst + i * one_batch_size;
-                        THINKER_RET_CHECK(luna_trans_axis_i8o8(src, dst, new_shape, new_axis, 3), "luna_trans_axis_i8o8");
+                        int8_t *p_src = (int8_t *)src + i * one_batch_size;
+                        int8_t *p_dst = (int8_t *)dst + i * one_batch_size;
+                        THINKER_RET_CHECK(luna_trans_axis_i8o8(p_src, p_dst, new_shape, new_axis, 3), "luna_trans_axis_i8o8");
                     }
                 }
                 else {
@@ -114,11 +114,11 @@ int32_t transpose_luna(tTensor *X, tTensor *Y, tTensor * workspace, uint32_t dim
                     }
                     if (one_batch_size <= workspace_size) {
                         for (int32_t i = 0; i < batch; i++) {
-                            int8_t *src = (int8_t *)src + i * one_batch_size;
-                            int8_t *dst = (int8_t *)dst + i * one_batch_size;
+                            int8_t *p_src = (int8_t *)src + i * one_batch_size;
+                            int8_t *p_dst = (int8_t *)dst + i * one_batch_size;
                             int8_t *src_temp = (int8_t *)workspace->dptr_;
-                            THINKER_RET_CHECK(luna_memcpy_i8o8(src_temp, (int8_t *)src, one_batch_size), "luna_memcpy_i8o8");
-                            THINKER_RET_CHECK(luna_trans_axis_i8o8(src_temp, (int8_t *)dst, new_shape, new_axis, 3), "luna_trans_axis_i8o8");
+                            THINKER_RET_CHECK(luna_memcpy_i8o8(src_temp, (int8_t *)p_src, one_batch_size), "luna_memcpy_i8o8");
+                            THINKER_RET_CHECK(luna_trans_axis_i8o8(src_temp, (int8_t *)p_dst, new_shape, new_axis, 3), "luna_trans_axis_i8o8");
                         }
                     }
                     else {

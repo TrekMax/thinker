@@ -17,89 +17,66 @@
 #include "thinker_status.h"
 
 /**
- * @brief Calculate PReLU operation
+ * @brief PReLU API function pointer type
+ */
+typedef void *luna_prelu_api_item;
+typedef int32_t (*luna_prelu_api)(const void *, int32_t, void *, uint32_t, int32_t);
+
+/**
+ * @brief PReLU API function table for different data types
+ */
+static luna_prelu_api_item luna_prelu_api_items[3][3] = {
+    {
+        API_LIB(prelu_i8o8),  // Int8 input -> Int8 output
+        API_LIB(prelu_i8o16),  // Int8 input -> Int16 output
+        API_LIB(prelu_i8o32)  // Int8 input -> Int32 output
+    },
+    {
+        API_LIB(prelu_i16o8),  // Int16 input -> Int8 output
+        API_LIB(prelu_i16o16),  // Int16 input -> Int16 output
+        API_LIB(prelu_i16o32)  // Int16 input -> Int32 output
+    },
+    {
+        API_LIB(prelu_i32o8),  // Int32 input -> Int8 output
+        API_LIB(prelu_i32o16),  // Int32 input -> Int16 output
+        API_LIB(prelu_i32o32)  // Int32 input -> Int32 output
+    }
+};
+
+/**
+ * @brief Calculate PReLU activation
  * @param X Input tensor
  * @param Y Output tensor
- * @param size Number of elements to process
+ * @param size Size of input data
  * @param slope PReLU slope parameter
- * @param post_shift Post scaling shift value
- * @return Execution status
+ * @param post_shift Post-shift value
+ * @return int32_t Operation status
  */
 static int32_t calc_prelu(tTensor *X, tTensor *Y, uint32_t size, int32_t slope, int32_t post_shift) {
-    // Determine data types and call corresponding PReLU function
-    switch (X->dtype_) {
-        case Int8:
-            switch (Y->dtype_) {
-                case Int8:
-                    THINKER_RET_CHECK(API_LIB(prelu_i8o8)((int8_t *)X->dptr_, slope, (int8_t *)Y->dptr_, size, post_shift), "luna_prelu_i8o8");
-                    break;
-                case Int16:
-                    THINKER_RET_CHECK(API_LIB(prelu_i8o16)((int8_t *)X->dptr_, slope, (int16_t *)Y->dptr_, size, post_shift), "luna_prelu_i8o16");
-                    break;
-                case Int32:
-                    THINKER_RET_CHECK(API_LIB(prelu_i8o32)((int8_t *)X->dptr_, slope, (int32_t *)Y->dptr_, size, post_shift), "luna_prelu_i8o32");
-                    break;
-                default:
-                    return T_ERR_INVALID_DATATYPE;
-            }
-            break;
-        case Int16:
-            switch (Y->dtype_) {
-                case Int8:
-                    THINKER_RET_CHECK(API_LIB(prelu_i16o8)((int16_t *)X->dptr_, slope, (int8_t *)Y->dptr_, size, post_shift), "luna_prelu_i16o8");
-                    break;
-                case Int16:
-                    THINKER_RET_CHECK(API_LIB(prelu_i16o16)((int16_t *)X->dptr_, slope, (int16_t *)Y->dptr_, size, post_shift), "luna_prelu_i16o16");
-                    break;
-                case Int32:
-                    THINKER_RET_CHECK(API_LIB(prelu_i16o32)((int16_t *)X->dptr_, slope, (int32_t *)Y->dptr_, size, post_shift), "luna_prelu_i16o32");
-                    break;
-                default:
-                    return T_ERR_INVALID_DATATYPE;
-            }
-            break;
-        case Int32:
-            switch (Y->dtype_) {
-                case Int8:
-                    THINKER_RET_CHECK(API_LIB(prelu_i32o8)((int32_t *)X->dptr_, slope, (int8_t *)Y->dptr_, size, post_shift), "luna_prelu_i32o8");
-                    break;
-                case Int16:
-                    THINKER_RET_CHECK(API_LIB(prelu_i32o16)((int32_t *)X->dptr_, slope, (int16_t *)Y->dptr_, size, post_shift), "luna_prelu_i32o16");
-                    break;
-                case Int32:
-                    THINKER_RET_CHECK(API_LIB(prelu_i32o32)((int32_t *)X->dptr_, slope, (int32_t *)Y->dptr_, size, post_shift), "luna_prelu_i32o32");
-                    break;
-                default:
-                    return T_ERR_INVALID_DATATYPE;
-            }
-            break;
-        default:
-            return T_ERR_INVALID_DATATYPE;
-    }
-
-    return T_SUCCESS;
+    int32_t in_idx = (X->dtype_ & 0xF) >> 1;      // Get input data type index
+    int32_t out_idx = (Y->dtype_ & 0xF) >> 1;     // Get output data type index
+    luna_prelu_api luna_prelu = (luna_prelu_api)(luna_prelu_api_items[in_idx][out_idx]); // Select appropriate API
+    return luna_prelu((const void *)X->dptr_, slope, (void *)Y->dptr_, size, post_shift);
 }
 
 /**
- * @brief Perform PReLU operation
+ * @brief Main PReLU function
  * @param X Input tensor
  * @param Y Output tensor
- * @param attrs PReLU attributes containing slope and post scaling shift
- * @return Execution status
+ * @param attrs PReLU attributes
+ * @return tStatus Operation status
  */
 tStatus prelu_luna(tTensor *X, tTensor *Y, PreluAttrs *attrs) {
-    tStatus status = T_ERR_FAIL;
-
-    // Check if input and output are in PSRAM
-    if (X->mem_.type_ != 2 || Y->mem_.type_ != 2) {
-        return T_ERR_NO_IMPLEMENTED;
-    }
-
-    // Get PReLU parameters
     int32_t slope = attrs->slope;
     int32_t post_shift = attrs->post_shift;
     uint32_t size = getTensorSize(X);
-
+#ifdef RUNTIME_PARAM_CHECK
+        /*Check the storage locations for input and output, 
+        as it is unnecessary because they have already been limited in tpacker.*/
+        if ((X->mem_.type_ != 2) || (Y->mem_.type_ != 2)) {
+            return T_ERR_INVALID_DATATYPE;
+        }
+#endif
     return calc_prelu(X, Y, size, slope, post_shift);
 }
 

@@ -66,9 +66,16 @@ static int32_t calc_prelu(tTensor *X, tTensor *Y, uint32_t size, int32_t slope, 
  * @return tStatus Operation status
  */
 tStatus prelu_luna(tTensor *X, tTensor *Y, PreluAttrs *attrs) {
-    int32_t slope = attrs->slope;
+    uint32_t slope = attrs->slope;
     int32_t post_shift = attrs->post_shift;
     uint32_t size = getTensorSize(X);
+#ifdef RUNTIME_PARAM_CHECK
+        /*Check the storage locations for input and output, 
+        as it is unnecessary because they have already been limited in tpacker.*/
+        if ((X->mem_.type_ != 2) || (Y->mem_.type_ != 2)) {
+            return T_ERR_INVALID_DATATYPE;
+        }
+#endif
     return calc_prelu(X, Y, size, slope, post_shift);
 }
 

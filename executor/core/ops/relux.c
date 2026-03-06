@@ -6,6 +6,10 @@
 #include "core/operator_register.h"
 #include "thinker_status.h"
 
+#ifdef THINKER_USE_ARCS
+#include "./arcs/relux.h" // VenusA backend implementation
+#endif
+
 #ifdef THINKER_USE_VENUSA
 #include "./venusA/relux.h" // VenusA backend implementation
 #endif
@@ -23,7 +27,7 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     
     ReluxAttrs *attrs = (ReluxAttrs *)((int8_t *)op + op->attr_offset_);
 
-#if THINKER_USE_VENUSA
+#if THINKER_USE_VENUSA || THINKER_USE_ARCS
 #if THINKER_PROFILE
     uint64_t start_t = tick_count();  // Start profiling
 #endif

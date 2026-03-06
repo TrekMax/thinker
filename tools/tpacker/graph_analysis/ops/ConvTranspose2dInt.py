@@ -6,13 +6,7 @@ from ...xsympy import is_sympy
 from ...enum_defines import MemType, Layout
 from ...resource_packer._type._ctype import tffi
 from .base import Operator, OperatorAttrs, register_op, ConvLayout
-from .utils import (
-    QuantType,
-    RoundMethod,
-    attr2tuple,
-    calc_deconv2d_output_shape,
-    calc_expr,
-)
+from .utils import (QuantType, RoundMethod, attr2tuple, calc_deconv2d_output_shape, calc_expr,)
 
 class ConvTranspose2dIntAttrs(OperatorAttrs):
     def checkparams(self) -> None:

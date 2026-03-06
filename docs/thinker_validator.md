@@ -40,9 +40,9 @@ tvalidator [options]
 | `-i`, `--input_path` | `str ...`   | 否    | 一个或多个输入文件路径。当需要手动指定输入时必须提供                           |
 | `--cfg`              | `key=value` | 否    | 动态 shape 配置参数                                 |
 ## 🧩 动态 Shape 参数说明（--cfg）
-value：以逗号分隔的整数列表，通常表示 (min, max, step)
+value：以逗号分隔的整数列表，通常表示 (min:max:step)
 - **key**：动态 shape 名称。  
-- **value**：以逗号分隔的整数列表，通常表示 (min, max, step)。 
+- **value**：以逗号分隔的整数列表，通常表示 (min:max:step)。 
 ### 示例
 ```bash
 --cfg seq_len=32:384:32

@@ -2,14 +2,14 @@ from .device_info import Device
 
 ARCS_CONFIGS = {
     "name": "ARCS",
-    "sram_size": 384 * 1024,  # 4096 KB
-    "psram_size": 8192 * 1024,  # 32768 KB
+    "sram_size": 384 * 1024,  # 384 KB
+    "psram_size": 8192 * 1024,  # 8192 KB
     "dma_support": True,
     "supported_operators": [
         "ArgMax", "Conv1dInt", "Conv2dInt", "ConvTranspose2dInt",
         "Relu", "Prelu", "Clip", "MaxPool", "AvgPool2dInt",
         "LinearInt", "GRUInt", "LSTMInt", "BmmInt",
-        "iqSigmoid", "iqTanh",
+        "iqSigmoid", "iqTanh", "Relux",
         "iqCat", "iqPad", "Transpose", "Reshape",
         "Squeeze", "Unsqueeze", "Flatten", "Slice",
         "iqSum", "iqSub", "iqAdd", "iqMul", "iqDiv",
