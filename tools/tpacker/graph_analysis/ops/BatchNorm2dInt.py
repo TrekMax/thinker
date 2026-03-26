@@ -6,7 +6,7 @@ from ...graph import Tensor
 from .utils import calc_expr
 from ...xsympy import is_sympy
 from .base import Operator, register_op
-from ...enum_defines import DevType, MemType
+from ...enum_defines import DevType, MemType, ALIGN4
 
 
 @register_op
@@ -46,7 +46,7 @@ class BatchNorm2dInt(Operator):
     def get_workspace(self) -> List[Tensor]:
         """Calculate and return workspace tensor."""
         X = self.inputs[0]
-        workspace_bytes = X.shape[2] * X.shape[3] * 4
+        workspace_bytes = ALIGN4(X.shape[2] * X.shape[3] * 6)
         return [Tensor.from_shape([workspace_bytes], np.int8, MemType.SHARE_MEM)]
 
     def flops_counter(self, dynamic_shape) -> int:

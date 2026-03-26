@@ -2,7 +2,7 @@ import math
 import numpy as np
 from typing import List
 from ...graph import Tensor
-from ...enum_defines import DevType
+from ...enum_defines import DevType, MemType
 from ...resource_packer._type._ctype import tffi
 from .base import iqBinaryOperator, OperatorAttrs, register_op
 
@@ -60,9 +60,13 @@ class iqPad(iqBinaryOperator):
     def get_workspace(self) -> List[Tensor]:
         """Calculate the required workspace for the iqPad operation."""
         input_data = self.inputs[0]
-        workspace_size = input_data.nbytes
-        if workspace_size != 0:
-            return [Tensor.from_shape([workspace_size], np.int8, input_data.mem_type)]
-        return []
+        output_data = self.outputs[0]
+        workspace_size = output_data.nbytes
+        if output_data.mem_type != MemType.SHARE_MEM:
+            workspace_size += output_data.nbytes
+        else:
+            workspace_size += input_data.nbytes
+
+        return [Tensor.from_shape([workspace_size], np.int8, MemType.SHARE_MEM)]
 
 __all__ = ["iqPad"]

@@ -39,7 +39,7 @@ int32_t batchnormint_luna(const tTensor *X, const tTensor *W, const tTensor *Bia
         return T_ERR_INVALID_DATATYPE;
     }
     int32_t workspace_size = workspace ? workspace->shape_.dims_[0] : 0; 
-    if (workspace_size < F * 4)
+    if (workspace_size < ALIGN4(F * 6))
         return T_ERR_NO_WORKSPACE;
 #endif
 
@@ -47,7 +47,8 @@ int32_t batchnormint_luna(const tTensor *X, const tTensor *W, const tTensor *Bia
     int8_t *p_dst = (int8_t *)Y->dptr_;    // Output data pointer
     int8_t *p_weight = (int8_t *)W->dptr_;    // Weight data pointer (gamma)
     int32_t *p_bias = (int32_t *)Bias->dptr_;    // Bias data pointer (beta)
-    int32_t *p_tmp = workspace ? (int32_t *)workspace->dptr_ : NULL;  // Pointer to temporary workspace
+    int16_t *p_tmp = workspace ? (int16_t *)workspace->dptr_ : NULL;  // Pointer to temporary workspace
+    int32_t *p_tmp2 = workspace ? (int32_t *)((int8_t *)workspace->dptr_ + ALIGN4(F * 2)) : NULL;
 
     int32_t q_x = (int32_t)X->scale_;    // Input scale factor
     int32_t q_w = (int32_t)W->scale_;    // Weight scale factor
@@ -67,9 +68,10 @@ int32_t batchnormint_luna(const tTensor *X, const tTensor *W, const tTensor *Bia
             int8_t *p_ou = p_dst + i * one_batch_size + j * F;    // Output pointer for current channel
 
             // Scale input by gamma and store intermediate results
-            THINKER_RET_CHECK(API_LIB(scale_i8i8o32)(p_in, w_val, p_tmp, F, 0), "luna_scale_i8i8o32");
+            THINKER_RET_CHECK(API_LIB(scale_i8i8o16)(p_in, w_val, p_tmp, F, 0), "luna_scale_i8i8o16");
+            THINKER_RET_CHECK(API_LIB(scale_i16i16o32)(p_tmp, 1, p_tmp2, F, 0), "luna_scale_i16i16o32");
             // Apply bias and scale to get final output
-            THINKER_RET_CHECK(API_LIB(offset_i32i32o8)(p_tmp, b_val, p_ou, F, shift), "luna_offset_i32i32o8");
+            THINKER_RET_CHECK(API_LIB(offset_i32i32o8)(p_tmp2, b_val, p_ou, F, shift), "luna_offset_i32i32o8");
         }
     }
 

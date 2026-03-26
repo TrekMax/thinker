@@ -23,11 +23,14 @@ class LinearIntAttrs(OperatorAttrs):
             quant_type = QuantType.from_str(self.attrs.get("platform_quant"))
         self.attrs['quant_mode'] = quant_type
 
+        transB = self.attrs.get("transB", 1)
+        self.attrs['transB'] = transB
+
     def serialize(self) -> bytes:
         """Serialize the attributes into bytes for the LinearInt operation."""
         attrs = tffi.new("LinearIntAttrs *")
         attrs.transA = 0
-        attrs.transB = 0
+        attrs.transB = self.attrs['transB']
         attrs.quant_type = self.attrs["quant_mode"].value
         return bytes(tffi.buffer(attrs))
 
@@ -46,7 +49,7 @@ class LinearInt(Operator):
         w_shape = list(W.shape)
 
         assert X.dtype in (np.int8,), "Input must be of type int8"
-        assert W.dtype in (np.int8, np.int32), "Weight must be of type int8 or int32"
+        assert W.dtype in (np.int8), "Weight must be of type int8"
         assert len(inputs) in {2, 3}, "LinearInt operator must have 2 or 3 inputs"
 
         # Calculate input dimensions
@@ -107,7 +110,7 @@ class LinearInt(Operator):
 
     def get_workspace(self) -> List[Tensor]:
         """Calculate the required workspace for the LinearInt operation."""
-        workspace_bytes = 0
+        workspace_size = 0
         data = self.inputs[0]
         weight = self.inputs[1]
         out = self.outputs[0]
@@ -116,41 +119,68 @@ class LinearInt(Operator):
 
         if platform == "arcs":
             if weight.dtype == np.int8:
-                workspace_bytes += self.inputs[0].nbytes
-                workspace_bytes += self.outputs[0].nbytes
+                workspace_size += self.inputs[0].nbytes
+                workspace_size += self.outputs[0].nbytes
             else:
-                workspace_bytes += self.inputs[0].nbytes * 4
-                workspace_bytes += self.outputs[0].nbytes * 4
+                workspace_size += self.inputs[0].nbytes * 4
+                workspace_size += self.outputs[0].nbytes * 4
         elif platform == "venusA":
             M = int(np.prod(data.shape[:-1]))
             N = data.shape[-1]
-            L = weight.shape[-1]
-
-            if weight.dtype == np.int8:
-                out_size = ALIGN4(M) * ALIGN8(L)
-                if out_size > 65536:
-                    workspace_bytes += max(data.nbytes * weight.dtype.itemsize, out.nbytes)
-                else:
-                    workspace_bytes += data.nbytes * weight.dtype.itemsize
-            elif weight.dtype == np.int16:
-                out_size = ALIGN4(M) * ALIGN4(L)
-                if out_size > 65536:
-                    workspace_bytes += max(data.nbytes * weight.dtype.itemsize, out.nbytes)
-                else:
-                    workspace_bytes += data.nbytes * weight.dtype.itemsize
+            if self.attrs['transB'] == 0:
+                L = weight.shape[1]
+                assert N == weight.shape[0], "N must be equal to weight shape 0 when transB =0"
             else:
-                out_size = ALIGN2(M) * ALIGN4(L)
-                if out_size > 32768:
-                    workspace_bytes += max(data.nbytes * weight.dtype.itemsize, out.nbytes)
+                L = weight.shape[0]
+                assert N == weight.shape[1], "N must be equal to weight shape 1 when transB =1"
+            input_size = M * N
+            output_size = M * L
+
+            if output.dtype == np.int8:
+                if output.mem_type != MemType.SHARE:
+                    if ALIGN4(L) * ALIGN8(M) <= 65536: 
+                        workspace_size = input_size + output_size
+                    else:
+                        workspace_size = output_size * 2
                 else:
-                    workspace_bytes += data.nbytes * weight.dtype.itemsize
+                    if ALIGN4(L) * ALIGN8(M) <= 65536: 
+                        workspace_size = 0
+                    else:
+                        workspace_size = input_size + output_size
+            elif output.dtype == np.int16:
+                if output.mem_type != MemType.SHARE:
+                    if ALIGN4(L) * ALIGN8(M) <= 65536: 
+                        workspace_size = ALIGN2(input_size) + output_size * 2
+                    else:
+                        workspace_size = output_size * 4
+                else:
+                    if ALIGN4(L) * ALIGN8(M) <= 65536: 
+                        workspace_size = 0
+                    else:
+                        workspace_size = ALIGN2(input_size) + output_size * 2
+            else:
+                if output.mem_type != MemType.SHARE:
+                    if ALIGN4(L) * ALIGN8(M) <= 65536: 
+                        workspace_size = ALIGN4(input_size) + output_size * 4
+                    else:
+                        workspace_size = output_size * 8
+                else:
+                    if ALIGN4(L) * ALIGN8(M) <= 65536: 
+                        workspace_size = 0
+                    else:
+                        workspace_size = ALIGN4(input_size) + output_size * 4
         elif platform == "venus":
             if len(self.inputs) > 2:
-                workspace_bytes = out.nbytes * self.inputs[2].dtype.itemsize
+                workspace_size = out.nbytes * self.inputs[2].dtype.itemsize
 
             M = int(np.prod(data.shape[:-1]))
             N = data.shape[-1]
-            L = weight.shape[-1]
+            if self.attrs['transB'] == 0:
+                L = weight.shape[1]
+                assert N == weight.shape[0]
+            else:
+                L = weight.shape[0]
+                assert N == weight.shape[1]
             assert data.dtype == np.int8 and weight.dtype == np.int8
 
             int8_condition_l = ALIGN4(M) * ALIGN8(N)
@@ -168,14 +198,14 @@ class LinearInt(Operator):
                     int8_condition_l_split = ALIGN4(split_M) * ALIGN8(N)
 
             if data.mem_type != MemType.SHARE_MEM and out.mem_type != MemType.SHARE_MEM:
-                workspace_bytes += split_M * max(N, L) + split_M * L * 4
+                workspace_size += split_M * max(N, L) + split_M * L * 4
             elif data.mem_type != MemType.SHARE_MEM:
-                workspace_bytes += split_M * N
+                workspace_size += split_M * N
             elif out.mem_type != MemType.SHARE_MEM:
-                workspace_bytes += split_M * L
+                workspace_size += split_M * L
 
-        if workspace_bytes:
-            return [Tensor.from_shape([workspace_bytes], np.int8, MemType.SHARE_MEM)]
+        if workspace_size:
+            return [Tensor.from_shape([workspace_size], np.int8, MemType.SHARE_MEM)]
         return []
 
     def pack_params(self):
@@ -186,6 +216,7 @@ class LinearInt(Operator):
         shape       = weight_data.shape
         platform = self.attrs.get("platform", "venus")
 
+        assert self.attrs['transB'] == 1, "Only support transB=1"
         if platform in {"arcs", "venusA"}:
             if weight_bits == 4:
                 new_weight_data = combine4bit_8bit(weight_data)

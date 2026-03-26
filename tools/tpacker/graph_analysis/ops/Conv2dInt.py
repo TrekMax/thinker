@@ -79,8 +79,8 @@ class Conv2dIntAttrs(OperatorAttrs):
 
         # Additional checks
         assert (kernels[0] >= strides[0] and kernels[1] >= strides[1]), "Kernel size must be >= stride size"
-        assert (pads[0] <= kernels[0] and pads[2] <= kernels[0]), "Pad width exceeds kernel width"
-        assert (pads[1] <= kernels[1] and pads[3] <= kernels[1]), "Pad height exceeds kernel height"
+        assert (pads[0] <= kernels[0] and pads[2] <= kernels[0]), "Pad width exceeds kernel height"
+        assert (pads[1] <= kernels[1] and pads[3] <= kernels[1]), "Pad height exceeds kernel width"
 
     def serialize(self) -> bytes:
         """Serialize the attributes into bytes for the Conv2dInt operation."""
@@ -153,13 +153,13 @@ class Conv2dInt(Operator, ConvLayout):
         assert kernels[0] == W.shape[2] and kernels[1] == W.shape[3], "Kernel size mismatch"
         if len(pads) == 4:
             assert (
-                x_w + pads[0] + pads[2] >= W.shape[3]
-                and x_h + pads[1] + pads[3] >= W.shape[2]
+                x_w + pads[1] + pads[3] >= W.shape[3]
+                and x_h + pads[0] + pads[2] >= W.shape[2]
             ), "Input and weight size mismatch"
         elif len(pads) == 2:
             assert (
-                x_w + pads[0] * 2 >= W.shape[3]
-                and x_h + pads[1] * 2 >= W.shape[2]
+                x_w + pads[1] * 2 >= W.shape[3]
+                and x_h + pads[0] * 2 >= W.shape[2]
             ), "Input and weight size mismatch"
 
         # Infer type and return output

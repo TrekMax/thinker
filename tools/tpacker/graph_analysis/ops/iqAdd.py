@@ -74,17 +74,20 @@ class iqAdd(iqBinaryOperator, BaseLayout):
         platform = self.attrs.get("platform", "venus")
 
         workspace_size = 0
-
-        if Y.mem_type != MemType.SHARE_MEM:
-            if (scale_x != scale_o) or x1.mem_type != MemType.SHARE_MEM:
-                workspace_size += size
-            if (scale_y != scale_o) or x2.mem_type != MemType.SHARE_MEM:
-                workspace_size += size
-            if Y.mem_type != MemType.SHARE_MEM:
-                workspace_size = max(workspace_size, size)
+        if (x1.mem_type==x2.mem_type) and scale_x==scale_o and scale_y==scale_o:
+            if Y.mem_type!=MemType.SHARE_MEM:   
+                workspace_size = Y.nbytes
+        elif scale_y==scale_o and x2.mem_type==MemType.SHARE_MEM:
+            if Y.mem_type!=MemType.SHARE_MEM:   
+                workspace_size = Y.nbytes
+        elif scale_x==scale_o and x1.mem_type==MemType.SHARE_MEM:    
+            if Y.mem_type!=MemType.SHARE_MEM:   
+                workspace_size = Y.nbytes
         else:
-            if (scale_x != scale_o or x1.mem_type != MemType.SHARE_MEM) and (scale_y != scale_o or x2.mem_type != MemType.SHARE_MEM):
-                workspace_size += size
+            if Y.mem_type!=MemType.SHARE_MEM:
+                workspace= Y.nbytes * 2
+            else:
+                workspace=Y.nbytes
 
         if platform == "venusA":
             workspace_size = min(workspace_size, 65536)

@@ -18,6 +18,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/stat.h>
 
 #include "../core/comm/thinker_log.h"
 #include "thinker_define.h"
@@ -33,6 +35,14 @@
 
 #if THINKER_DUMP
 
+void create_directory_if_not_exists(const char *path) {
+    if (access(path, F_OK) != 0) {
+        if (mkdir(path, S_IRWXU | S_IRWXG | S_IROTH) != 0) {
+            perror("创建目录失败");
+            exit(EXIT_FAILURE);
+        }
+    }
+}
 #if THINKER_DUMP_CRC32
 
 /**
@@ -54,7 +64,9 @@ void write_file(char *output_name, tTensor *tensor) {
     
     // Build file path with shape information
     uint32_t shape_dim = tensor->shape_.ndim_;
+    // snprintf(save_path, "./data/dump_thinker/%s##", output_name);
     snprintf(save_path, "./workspace/data/%s##", output_name);
+    create_directory_if_not_exists("./workspace/data");
     size_t size = 1;
     for (int32_t j = 0; j < shape_dim; ++j) {
         size *= tensor->shape_.dims_[j];
@@ -98,7 +110,9 @@ void write_file(char *output_name, tTensor *tensor) {
     
     // Build file path with shape information
     uint32_t shape_dim = tensor->shape_.ndim_;
+    // snprintf(save_path, "./data/dump_thinker/%s##", output_name);
     snprintf(save_path, "./workspace/data/%s##", output_name);
+    create_directory_if_not_exists("./workspace/data");
     size_t size = 1;
     for (int32_t j = 0; j < shape_dim; ++j) {
         size *= tensor->shape_.dims_[j];
@@ -151,7 +165,9 @@ void write_file(char *output_name, tTensor *tensor) {
     
     // Build file path with shape information
     uint32_t shape_dim = tensor->shape_.ndim_;
+    // snprintf(save_path, sizeof(save_path), "./data/dump_thinker/%s##", output_name);
     snprintf(save_path, sizeof(save_path), "./workspace/data/%s##", output_name);
+    create_directory_if_not_exists("./workspace/data");
     size_t size = 1;
     for (int32_t j = 0; j < shape_dim; ++j) {
         size *= tensor->shape_.dims_[j];

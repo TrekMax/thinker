@@ -113,9 +113,11 @@ int32_t gru_luna_inner(gru_param_t *params, int32_t t, int8_t *p_input, int8_t *
     THINKER_RET_CHECK(API_LIB(sigmoid_i32o32)(p_update_gate, p_update_gate, hidden_size), "luna_sigmoid_i32o32");         // active_q_in => active_q_out
 
     // Step 1: Compute r_t ⊙ h_{t-1} (element-wise multiplication)
-    int32_t *p_h_in_int32 = p_out2;
-    int8_t *p_h_reset = (int8_t *)p_out2 + hidden_size * 4;
-    THINKER_RET_CHECK(API_LIB(scale_i8i8o32)(p_h_in, 1, p_h_in_int32, hidden_size, 0), "luna_scale_i8i8o32");
+    int16_t *p_h_in_int16 = (int16_t *)p_out2;
+    int32_t *p_h_in_int32 = (int32_t *)((int16_t *)p_out2 + ALIGN2(hidden_size));
+    int8_t *p_h_reset = (int8_t *)p_out2 + ALIGN4(hidden_size * 6);
+    THINKER_RET_CHECK(API_LIB(scale_i8i8o16)(p_h_in, 1, p_h_in_int16, hidden_size, 0), "luna_scale_i8i8o16");
+    THINKER_RET_CHECK(API_LIB(scale_i16i16o32)(p_h_in_int16, 1, p_h_in_int32, hidden_size, 0), "luna_scale_i16i16o32");
     THINKER_RET_CHECK(API_LIB(mul_i32i32o8)(p_reset_gate, p_h_in_int32, p_h_reset, hidden_size, active_q_out), "luna_mul_i32i32o8");;  // active_q_out + h_q - active_q_out => h_q
     // THINKER_RET_CHECK(API_LIB(scale_i32i32o8)(p_h_in_int32, 1, p_h_reset, hidden_size, 0);
     

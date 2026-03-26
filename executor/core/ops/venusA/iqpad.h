@@ -38,6 +38,7 @@ int32_t iqpad_luna(tTensor *X, tTensor *P, tTensor *data, tTensor *workspace, tT
     int32_t w_in = X->shape_.dims_[3];
     int32_t h_out = Y->shape_.dims_[2];
     int32_t w_out = Y->shape_.dims_[3];
+    int32_t in_size = c_in * h_in * w_in;
     int32_t out_size = c_in * h_out * w_out;
 
     // Parse padding parameters
@@ -76,6 +77,8 @@ int32_t iqpad_luna(tTensor *X, tTensor *P, tTensor *data, tTensor *workspace, tT
     int8_t *src = (int8_t *)X->dptr_;
     int8_t *dst = (int8_t *)Y->dptr_;
     int8_t mode = attrs->mode;
+    bool srcInPSRAM = (X->mem_.type_ != 2);
+    bool dstInPSRAM = (Y->mem_.type_ != 2);
 
     // Check mode validity
     if (mode < 0 || mode > 2) {
@@ -90,184 +93,111 @@ int32_t iqpad_luna(tTensor *X, tTensor *P, tTensor *data, tTensor *workspace, tT
 
     // Temporary workspace
     int8_t *temp = (int8_t *)workspace->dptr_;
-    THINKER_RET_CHECK(API_LIB(split_mat_trans_i8o8)(src, temp, c_in, h_in * w_in), "luna_split_mat_trans_i8o8");
+    int8_t *src_temp = temp + c_in * h_out * w_out;
+    int8_t *dst_temp = temp;
+
+    if (srcInPSRAM) {
+        int8_t *src_temp1 = temp;
+        THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(src_temp1, src, in_size), "luna_memcpy_i8o8");
+        THINKER_RET_CHECK(API_LIB(split_mat_trans_i8o8)(src_temp1, src_temp, c_in, h_in * w_in), "luna_split_mat_trans_i8o8");
+    }
+    else
+        THINKER_RET_CHECK(API_LIB(split_mat_trans_i8o8)(src, src_temp, c_in, h_in * w_in), "luna_split_mat_trans_i8o8");
 
     // Perform padding based on mode
     switch (mode) {
         case 0: {  // Constant padding (fill with zero)
-            if (Y->mem_.type_ == 2) {
-                THINKER_RET_CHECK(API_LIB(memset_i8o8)(dst, fill_data, out_size), "luna_memset_i8o8");
-                for (int32_t i = 0; i < h_in; i++) {
-                    for (int32_t j = 0; j < w_in; j++) {
-                        THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(dst + ((i + pads_h_up) * w_out + j + pads_w_left) * c_in, 
-                                                 temp + (i * w_in + j) * c_in, c_in), "luna_memcpy_i8o8");
-                    }
-                }
-            } else {
-                memset(dst, fill_data, out_size);
-                for (int32_t i = 0; i < h_in; i++) {
-                    for (int32_t j = 0; j < w_in; j++) {
-                        opi_psram_cpy_out(dst + ((i + pads_h_up) * w_out + j + pads_w_left) * c_in, 
-                                        temp + (i * w_in + j) * c_in, c_in);
-                    }
+            THINKER_RET_CHECK(API_LIB(memset_i8o8)(dst_temp, fill_data, out_size), "luna_memset_i8o8");
+            for (int32_t i = 0; i < h_in; i++) {
+                for (int32_t j = 0; j < w_in; j++) {
+                    THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(dst_temp + ((i + pads_h_up) * w_out + j + pads_w_left) * c_in, 
+                                                src_temp + (i * w_in + j) * c_in, c_in), "luna_memcpy_i8o8");
                 }
             }
             break;
         }
 
         case 1: {  // Replicate padding (fill with last data)
-            if (Y->mem_.type_ == 2) {
-                for (int32_t i = 0; i < h_in; i++) {
-                    for (int32_t j = 0; j < w_in; j++) {
-                        THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(dst + ((i + pads_h_up) * w_out + j + pads_w_left) * c_in, 
-                                                 temp + (i * w_in + j) * c_in, c_in), "luna_memcpy_i8o8");
-                    }
+            for (int32_t i = 0; i < h_in; i++) {
+                for (int32_t j = 0; j < w_in; j++) {
+                    THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(dst_temp + ((i + pads_h_up) * w_out + j + pads_w_left) * c_in, 
+                                                src_temp + (i * w_in + j) * c_in, c_in), "luna_memcpy_i8o8");
                 }
-                if (pads_h_up > 0) {
-                    for (int32_t i = 0; i < pads_h_up; i++) {
-                        THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(dst + (i * w_out + pads_w_left) * c_in, temp, w_in * c_in), "luna_memcpy_i8o8");
-                    }
+            }
+            if (pads_h_up > 0) {
+                for (int32_t i = 0; i < pads_h_up; i++) {
+                    THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(dst_temp + (i * w_out + pads_w_left) * c_in, src_temp, w_in * c_in), "luna_memcpy_i8o8");
                 }
-                if (pads_w_left > 0) {
-                    for (int32_t i = 0; i < h_in + pads_h_up; i++) {
-                        for (int32_t j = 0; j < pads_w_left; j++) {
-                            for (int32_t k = 0; k < c_in; k++) {
-                                dst[(i * w_out + j) * c_in + k] = dst[(i * w_out + pads_w_left) * c_in + k];
-                            }
+            }
+            if (pads_w_left > 0) {
+                for (int32_t i = 0; i < h_in + pads_h_up; i++) {
+                    for (int32_t j = 0; j < pads_w_left; j++) {
+                        for (int32_t k = 0; k < c_in; k++) {
+                            dst_temp[(i * w_out + j) * c_in + k] = dst_temp[(i * w_out + pads_w_left) * c_in + k];
                         }
-                    }
-                }
-                if (pads_h_down > 0) {
-                    for (int32_t i = h_in + pads_h_up; i < h_out; i++) {
-                        THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(dst + i * w_out * c_in, 
-                                                 dst + (h_in + pads_h_up - 1) * w_out * c_in, (w_in + pads_w_left) * c_in),
-                                                 "luna_memcpy_i8o8");
-                    }
-                }
-            } else {
-                for (int32_t i = 0; i < h_in; i++) {
-                    for (int32_t j = 0; j < w_in; j++) {
-                        opi_psram_cpy_out(dst + ((i + pads_h_up) * w_out + j + pads_w_left) * c_in, 
-                                        temp + (i * w_in + j) * c_in, c_in);
-                    }
-                }
-                if (pads_h_up > 0) {
-                    for (int32_t i = 0; i < pads_h_up; i++) {
-                        opi_psram_cpy_out(dst + (i * w_out + pads_w_left) * c_in, temp, w_in * c_in);
-                    }
-                }
-                if (pads_w_left > 0) {
-                    for (int32_t i = 0; i < h_in + pads_h_up; i++) {
-                        for (int32_t j = 0; j < pads_w_left; j++) {
-                            for (int32_t k = 0; k < c_in; k++) {
-                                dst[(i * w_out + j) * c_in + k] = dst[(i * w_out + pads_w_left) * c_in + k];
-                            }
-                        }
-                    }
-                }
-                if (pads_h_down > 0) {
-                    for (int32_t i = h_in + pads_h_up; i < h_out; i++) {
-                        opi_psram_cpy_out(dst + i * w_out * c_in, 
-                                        dst + (h_in + pads_h_up - 1) * w_out * c_in, (w_in + pads_w_left) * c_in);
                     }
                 }
             }
-            if (pads_w_right > 0) {
-                for (int32_t i = 0; i < h_out; i++) {
-                    for (int32_t j = w_in + pads_w_left; j < w_out; j++) {
-                        for (int32_t k = 0; k < c_in; k++) {
-                            dst[(i * w_out + j) * c_in + k] = dst[(i * w_out + w_in + pads_w_left - 1) * c_in + k];
-                        }
-                    }
+            if (pads_h_down > 0) {
+                for (int32_t i = h_in + pads_h_up; i < h_out; i++) {
+                    THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(dst_temp + i * w_out * c_in, 
+                                                dst_temp + (h_in + pads_h_up - 1) * w_out * c_in, (w_in + pads_w_left) * c_in),
+                                                "luna_memcpy_i8o8");
                 }
             }
             break;
         }
 
         case 2: {  // Reflect padding
-            if (Y->mem_.type_ == 2) {
-                for (int32_t i = 0; i < h_in; i++) {
-                    for (int32_t j = 0; j < w_in; j++) {
-                        THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(dst + ((i + pads_h_up) * w_out + j + pads_w_left) * c_in, 
-                                                 temp + (i * w_in + j) * c_in, c_in), "luna_memcpy_i8o8");
-                    }
+            for (int32_t i = 0; i < h_in; i++) {
+                for (int32_t j = 0; j < w_in; j++) {
+                    THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(dst_temp + ((i + pads_h_up) * w_out + j + pads_w_left) * c_in, 
+                                                src_temp + (i * w_in + j) * c_in, c_in), "luna_memcpy_i8o8");
                 }
-                if (pads_h_up > 0) {
-                    for (int32_t i = 0; i < pads_h_up; i++) {
-                        THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(dst + (i * w_out + pads_w_left) * c_in, 
-                                                 temp + (pads_h_up - i) * w_in * c_in, w_in * c_in),
-                                                 "luna_memcpy_i8o8");
-                    }
+            }
+            if (pads_h_up > 0) {
+                for (int32_t i = 0; i < pads_h_up; i++) {
+                    THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(dst_temp + (i * w_out + pads_w_left) * c_in, 
+                                                src_temp + (pads_h_up - i) * w_in * c_in, w_in * c_in),
+                                                "luna_memcpy_i8o8");
                 }
-                if (pads_w_left > 0) {
-                    for (int32_t i = 0; i < h_in + pads_h_up; i++) {
-                        for (int32_t j = 0; j < pads_w_left; j++) {
-                            for (int32_t k = 0; k < c_in; k++) {
-                                dst[(i * w_out + j) * c_in + k] = dst[(i * w_out + 2 * pads_w_left - j) * c_in + k];
-                            }
+            }
+            if (pads_w_left > 0) {
+                for (int32_t i = 0; i < h_in + pads_h_up; i++) {
+                    for (int32_t j = 0; j < pads_w_left; j++) {
+                        for (int32_t k = 0; k < c_in; k++) {
+                            dst_temp[(i * w_out + j) * c_in + k] = dst_temp[(i * w_out + 2 * pads_w_left - j) * c_in + k];
                         }
-                    }
-                }
-                if (pads_h_down > 0) {
-                    for (int32_t i = h_in + pads_h_up; i < h_out; i++) {
-                        THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(dst + i * w_out * c_in, 
-                                                 dst + (2 * (h_in + pads_h_up) - i - 2) * w_out * c_in, (w_in + pads_w_left) * c_in),
-                                                 "luna_memcpy_i8o8");
-                    }
-                }
-            } else {
-                for (int32_t i = 0; i < h_in; i++) {
-                    for (int32_t j = 0; j < w_in; j++) {
-                        opi_psram_cpy_out(dst + ((i + pads_h_up) * w_out + j + pads_w_left) * c_in, 
-                                        temp + (i * w_in + j) * c_in, c_in);
-                    }
-                }
-                if (pads_h_up > 0) {
-                    for (int32_t i = 0; i < pads_h_up; i++) {
-                        opi_psram_cpy_out(dst + (i * w_out + pads_w_left) * c_in, 
-                                        temp + (pads_h_up - i) * w_in * c_in, w_in * c_in);
-                    }
-                }
-                if (pads_w_left > 0) {
-                    for (int32_t i = 0; i < h_in + pads_h_up; i++) {
-                        for (int32_t j = 0; j < pads_w_left; j++) {
-                            for (int32_t k = 0; k < c_in; k++) {
-                                dst[(i * w_out + j) * c_in + k] = dst[(i * w_out + 2 * pads_w_left - j) * c_in + k];
-                            }
-                        }
-                    }
-                }
-                if (pads_h_down > 0) {
-                    for (int32_t i = h_in + pads_h_up; i < h_out; i++) {
-                        opi_psram_cpy_out(dst + i * w_out * c_in, 
-                                        dst + (2 * (h_in + pads_h_up) - i - 2) * w_out * c_in, (w_in + pads_w_left) * c_in);
                     }
                 }
             }
-            if (pads_w_right > 0) {
-                for (int32_t i = 0; i < h_out; i++) {
-                    for (int32_t j = w_in + pads_w_left; j < w_out; j++) {
-                        for (int32_t k = 0; k < c_in; k++) {
-                            dst[(i * w_out + j) * c_in + k] = dst[(i * w_out + 2 * (w_in + pads_w_left) - j - 2) * c_in + k];
-                        }
-                    }
+            if (pads_h_down > 0) {
+                for (int32_t i = h_in + pads_h_up; i < h_out; i++) {
+                    THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(dst_temp + i * w_out * c_in, 
+                                                dst_temp + (2 * (h_in + pads_h_up) - i - 2) * w_out * c_in, (w_in + pads_w_left) * c_in),
+                                                "luna_memcpy_i8o8");
                 }
             }
             break;
         }
 
         default:
-            memset(dst, fill_data, out_size);
+            memset(dst_temp, fill_data, out_size);
             for (int32_t i = 0; i < h_in; i++) {
                 for (int32_t j = 0; j < w_in; j++) {
-                    opi_psram_cpy_out(dst + ((i + pads_h_up) * w_out + j + pads_w_left) * c_in, 
-                                    temp + (i * w_in + j) * c_in, c_in);
+                    opi_psram_cpy_out(dst_temp + ((i + pads_h_up) * w_out + j + pads_w_left) * c_in, 
+                                    src_temp + (i * w_in + j) * c_in, c_in);
                 }
             }
             break;
     }
-
-    THINKER_RET_CHECK(API_LIB(split_mat_trans_i8o8)(dst, dst, h_out * w_out, c_in), "luna_split_mat_trans_i8o8");
+    if (dstInPSRAM) {
+        int8_t *dst_temp1 = temp + c_in * h_out * w_out;
+        THINKER_RET_CHECK(API_LIB(split_mat_trans_i8o8)(dst_temp, dst_temp1, h_out * w_out, c_in), "luna_split_mat_trans_i8o8");
+        opi_psram_cpy_out(dst, dst_temp1, out_size);
+    }
+    else
+        THINKER_RET_CHECK(API_LIB(split_mat_trans_i8o8)(dst_temp, dst, h_out * w_out, c_in), "luna_split_mat_trans_i8o8");
     return T_SUCCESS;
 }
 

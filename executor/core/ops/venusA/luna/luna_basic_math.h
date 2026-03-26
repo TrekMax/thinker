@@ -63,7 +63,7 @@ int32_t luna_sub_i32i32o64(const int32_t *src1, const int32_t *src2, int64_t *ds
 
 int32_t luna_mul_i8i8o8(const int8_t *src1, const int8_t *src2, int8_t *dst, uint32_t size, uint32_t shift);
 int32_t luna_mul_i8i8o16(const int8_t *src1, const int8_t *src2, int16_t *dst, uint32_t size, uint32_t shift);
-int32_t luna_mul_i8i8o32(const int8_t *src1, const int8_t *src2, int32_t *dst, uint32_t size, uint32_t shift);
+// int32_t luna_mul_i8i8o32(const int8_t *src1, const int8_t *src2, int32_t *dst, uint32_t size, uint32_t shift);
 int32_t luna_mul_i16i16o8(const int16_t *src1, const int16_t *src2, int8_t *dst, uint32_t size, uint32_t shift);
 int32_t luna_mul_i16i16o16(const int16_t *src1, const int16_t *src2, int16_t *dst, uint32_t size, uint32_t shift);
 int32_t luna_mul_i16i16o32(const int16_t *src1, const int16_t *src2, int32_t *dst, uint32_t size, uint32_t shift);
@@ -74,7 +74,7 @@ int32_t luna_mul_i32i32o64(const int32_t *src1, const int32_t *src2, int64_t *ds
 
 int32_t luna_scale_i8i8o8(const int8_t *src1, const int8_t scalar, int8_t *dst, uint32_t size, uint32_t shift);
 int32_t luna_scale_i8i8o16(const int8_t *src1, const int8_t scalar, int16_t *dst, uint32_t size, uint32_t shift);
-int32_t luna_scale_i8i8o32(const int8_t *src1, const int8_t scalar, int32_t *dst, uint32_t size, uint32_t shift);
+// int32_t luna_scale_i8i8o32(const int8_t *src1, const int8_t scalar, int32_t *dst, uint32_t size, uint32_t shift);
 int32_t luna_scale_i16i16o8(const int16_t *src1, const int16_t scalar, int8_t *dst, uint32_t size, uint32_t shift);
 int32_t luna_scale_i16i16o16(const int16_t *src1, const int16_t scalar, int16_t *dst, uint32_t size, uint32_t shift);
 int32_t luna_scale_i16i16o32(const int16_t *src1, const int16_t scalar, int32_t *dst, uint32_t size, uint32_t shift);

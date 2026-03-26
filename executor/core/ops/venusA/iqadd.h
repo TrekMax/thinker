@@ -54,10 +54,21 @@ int32_t iqadd_luna(tTensor *X1, tTensor *X2, tTensor *Temp, tTensor *Y) {
             int8_t *workspace = Temp ? (int8_t *)Temp->dptr_ : NULL;
             int8_t *dst_temp = y_in_psram ? workspace : (int8_t *)dst;
             if ((x1_in_psram == x2_in_psram) && (shift1 == 0) && (shift2 == 0))
-            {
-                THINKER_RET_CHECK(API_LIB(add_i8i8o8)((const int8_t *)src1, (int8_t *)src2, (int8_t *)dst, total_size, 0), "luna_add_i8i8o8");
+            {   
+                if (!y_in_psram) {
+                    THINKER_RET_CHECK(API_LIB(add_i8i8o8)((const int8_t *)src1, (int8_t *)src2, (int8_t *)dst_temp, total_size, 0), "luna_add_i8i8o8");
+                }
+                else {
+                    while (past_size < total_size) {
+                        int32_t remain_size = total_size - past_size;
+                        int32_t cur_size = workspace_size < remain_size ? workspace_size : remain_size;
+                        THINKER_RET_CHECK(API_LIB(add_i8i8o8)((const int8_t *)src1 + past_size, (int8_t *)src2 + past_size, (int8_t *)dst_temp, cur_size, 0), "luna_add_i8i8o8");
+                        opi_psram_cpy_out((void *)dst + past_size, dst_temp, cur_size * sizeof(int8_t));
+                        past_size += cur_size;
+                    }
+                }
             }
-            else if ((shift1 != 0) && (shift2 == 0) && (!x2_in_psram))
+            else if ((shift2 == 0) && (!x2_in_psram))
             {
                 if (!y_in_psram) {
                     int8_t *src1_temp = dst_temp;
@@ -65,8 +76,7 @@ int32_t iqadd_luna(tTensor *X1, tTensor *X2, tTensor *Temp, tTensor *Y) {
                     THINKER_RET_CHECK(API_LIB(add_i8i8o8)((const int8_t *)src1_temp, (int8_t *)src2, (int8_t *)dst, total_size, 0), "luna_add_i8i8o8");
                 }
                 else {
-                    while (past_size < total_size)
-                    {
+                    while (past_size < total_size) {
                         int32_t remain_size = total_size - past_size;
                         int32_t cur_size = workspace_size < remain_size ? workspace_size : remain_size;
 
@@ -80,7 +90,7 @@ int32_t iqadd_luna(tTensor *X1, tTensor *X2, tTensor *Temp, tTensor *Y) {
                     }
                 }
             }
-            else if ((shift1 == 0) && (shift2 != 0) && (!x1_in_psram))
+            else if ((shift1 == 0) && (!x1_in_psram))
             {
                 if (!y_in_psram) {
                     int8_t *src2_temp = dst_temp;

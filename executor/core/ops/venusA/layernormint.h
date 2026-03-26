@@ -306,107 +306,63 @@ int32_t layernormalint_venus(const tTensor *X, const tTensor *W, const tTensor *
 	int32_t q_y         = (int32_t)Y->scale_;
 	int32_t shift       = q_normal + q_gamma - q_y;
 
-	int32_t *sum_x      = (int32_t *)p_tmp;
-	int32_t *sum_x2     = (int32_t *)(p_tmp + sizeof(int32_t));
-	int32_t *p_y1       = (int32_t *)(p_tmp + 2 * sizeof(int32_t));
-	int32_t *p_src2     = (int32_t *)(p_tmp + (T + 2) * sizeof(int32_t));
-	int32_t *p_numerator= p_src2;
-	int32_t *p_y2       = p_src2;
+    int16_t *p_src2_int16= (int16_t *)p_tmp;
+	int32_t *p_src2     = (int32_t *)(p_tmp + ALIGN2(T) * sizeof(int16_t)); // T * sizeof(int32_t)
+
+    int16_t *p_numerator_int16 = (int16_t *)p_tmp;
+	int32_t *p_numerator= (int32_t *)(p_tmp + ALIGN2(T) * sizeof(int16_t)); // T * sizeof(int32_t)
+
+	int32_t *p_y1       = (int32_t *)p_tmp;
+    int16_t *p_weight_int16 = (int16_t *)(p_tmp + T * sizeof(int32_t)); // T * sizeof(int32_t)
+    int32_t *p_weight   = (int32_t *)(p_tmp + T * sizeof(int32_t) + ALIGN2(T) * sizeof(int16_t)); // T * sizeof(int32_t)
+
+	int32_t *p_y2       = p_y1;
 
 	int64_t q_eps = floor(eps * (1 << (q_x * 2)) * T * T + 0.5f);
 
-    int8_t *p_weight_tmp = (int8_t *)(p_tmp + (2 * T + 2) * sizeof(int32_t));
-    int32_t *p_bias_tmp = (int32_t *)(p_weight_tmp + T * sizeof(int8_t));
-    if (2 != W->mem_.type_)
-    {
-        THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(p_weight_tmp, p_gamma, T * sizeof(int8_t)), "luna_memcpy_i8o8");
-        THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)p_bias_tmp, (int8_t *)p_beta, T * sizeof(int32_t)), "luna_memcpy_i8o8");
-    }
-    else
-    {
-        p_weight_tmp = p_gamma;
-        p_bias_tmp = p_beta;
-    }
+    for (int i = 0; i < leading; i++) {
+        int8_t *p_src_once = p_src + i * T;
+        int8_t *p_dst_once = p_dst + i * T;
 
-    int8_t* p_src_tmp   = (int8_t*)(p_bias_tmp + T * sizeof(int32_t));
-    int8_t* p_dst_tmp   = (int8_t*)(p_src_tmp + T * sizeof(int8_t));
-
-	//step1: sum(xi) and sum(xi^2)
-    if (Int4 == W->dtype_) {
-        for (int i = 0; i < leading; i++) {
-            int8_t *p_src_once = p_src + i * T;
-            int8_t *p_dst_once = p_dst + i * T;
-
-            if (X->mem_.mem_type_ != 2) {
-            	THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(p_src_tmp, p_src + i * T, T * sizeof(int8_t)), "luna_memcpy_i8o8");
-                p_src_once = p_src_tmp;
-            }
-            if (Y->mem_.mem_type_ != 2) {
-                p_dst_once = p_dst_tmp;
-            }
-
-            THINKER_RET_CHECK(API_LIB(vector_sum_i8o32)(p_src_once, sum_x, T, 0), "luna_vector_sum_i8o32");         // sum(x)
-            THINKER_RET_CHECK(API_LIB(mul_i8i8o32)(p_src_once, p_src_once, p_src2, T, 0), "luna_mul_i8i8o32"); // x^2
-            THINKER_RET_CHECK(API_LIB(vector_sum_i32o32)(p_src2, sum_x2, T, 0), "luna_vector_sum_i32o32");          // sum(x^2)
-
-            int32_t sum_x_val   = *sum_x;
-            int32_t sum_x2_val  = *sum_x2;
-            int64_t denominator = (int64_t)(T * sum_x2_val) - (int64_t)(sum_x_val * sum_x_val); // N * sum(x^2) - (sum(x))^2
-            denominator = denominator + q_eps;
-            int32_t label_shift = 0;
-            int32_t *p_weight   = p_src2;
-            denominator = calc_sqrt_reciprocal((const int64_t)denominator, q_x, &label_shift);  // 1/N
-            THINKER_RET_CHECK(API_LIB(scale_i8i8o32)(p_src_once, 1, p_numerator, T, 0), "luna_scale_i8i8o32");
-            THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(p_numerator, T, p_numerator, T, 0), "luna_scale_i32i32o32");                // T*x
-            THINKER_RET_CHECK(API_LIB(offset_i32i32o32)(p_numerator, (0 - sum_x_val), p_numerator, T, 0), "luna_offset_i32i32o32");
-            THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(p_numerator, denominator, (int32_t *)p_y1, T, label_shift), "luna_scale_i32i32o32");
-            // THINKER_RET_CHECK(API_LIB(scale_i8i8o32)(p_weight_tmp, 1, p_weight, T, 0);
-            convert_4bitto32bit(p_weight, p_weight_tmp, T);
-            THINKER_RET_CHECK(API_LIB(mul_i32i32o32)(p_y1, p_weight, p_y2, T, 0), "luna_mul_i32i32o32");
-            THINKER_RET_CHECK(API_LIB(add_i32i32o8)(p_y2, p_bias_tmp, p_dst_once, T, shift), "luna_add_i32i32o8");
-            if (Y->mem_.mem_type_ != 2) {
-            	opi_psram_cpy_out(p_dst + i * T, p_dst_once, T * sizeof(int8_t));
-            }
+        if (Y->mem_.mem_type_ != 2) {
+            p_dst_once = (int8_t *)p_tmp;
         }
-    }
-    else if (Int8 == W->dtype_) {
-        for (int i = 0; i < leading; i++) {
-            int8_t *p_src_once = p_src + i * T;
-            int8_t *p_dst_once = p_dst + i * T;
+        int32_t sum_x, sum_x2;
+        THINKER_RET_CHECK(API_LIB(vector_sum_i8o32)(p_src_once, &sum_x, T, 0), "luna_vector_sum_i8o32");        // sum(x)
+        THINKER_RET_CHECK(API_LIB(mul_i8i8o16)(p_src_once, p_src_once, p_src2_int16, T, 0), "luna_mul_i8i8o16"); //not support mul_i8i8o32
+        THINKER_RET_CHECK(API_LIB(scale_i16i16o32)(p_src2_int16, 1, p_src2, T, 0), "luna_scale_i16i16o32");     // x^2
+        THINKER_RET_CHECK(API_LIB(vector_sum_i32o32)(p_src2, &sum_x2, T, 0), "luna_vector_sum_i32o32");          // sum(x^2)
 
-            if (X->mem_.mem_type_ != 2) {
-                THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(p_src_tmp, p_src + i * T, T * sizeof(int8_t)), "luna_memcpy_i8o8");
-                p_src_once = p_src_tmp;
-            }
-            if (Y->mem_.mem_type_ != 2) {
-                p_dst_once = p_dst_tmp;
-            }
+        int64_t denominator = (int64_t)(T * sum_x2) - (int64_t)(sum_x * sum_x); // N * sum(x^2) - (sum(x))^2
+        denominator = denominator + q_eps;
 
-            THINKER_RET_CHECK(API_LIB(vector_sum_i8o32)(p_src_once, sum_x, T, 0), "luna_vector_sum_i8o32");        // sum(x)
-            THINKER_RET_CHECK(API_LIB(mul_i8i8o32)(p_src_once, p_src_once, p_src2, T, 0), "luna_mul_i8i8o32"); // x^2
-            THINKER_RET_CHECK(API_LIB(vector_sum_i32o32)(p_src2, sum_x2, T, 0), "luna_vector_sum_i32o32");          // sum(x^2)
+        int32_t label_shift = 0;
+        int32_t *p_weight   = p_src2;
+        denominator = calc_sqrt_reciprocal((const int64_t)denominator, q_x, &label_shift);  // 1/N
 
-            int32_t sum_x_val   = *sum_x;
-            int32_t sum_x2_val  = *sum_x2;
-            int64_t denominator = (int64_t)(T * sum_x2_val) - (int64_t)(sum_x_val * sum_x_val); // N * sum(x^2) - (sum(x))^2
-            denominator = denominator + q_eps;
+        THINKER_RET_CHECK(API_LIB(scale_i8i8o16)(p_src_once, 1, p_numerator_int16, T, 0), "luna_scale_i8i8o16");
+        THINKER_RET_CHECK(API_LIB(scale_i16i16o32)(p_numerator_int16, 1, p_numerator, T, 0), "luna_scale_i16i16o32");
+        THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(p_numerator, T, p_numerator, T, 0), "luna_scale_i32i32o32");                // T*x
+        THINKER_RET_CHECK(API_LIB(offset_i32i32o32)(p_numerator, (0 - sum_x), p_numerator, T, 0), "luna_offset_i32i32o32");
+        THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(p_numerator, denominator, (int32_t *)p_y1, T, label_shift), "luna_scale_i32i32o32");
 
-            int32_t label_shift = 0;
-            int32_t *p_weight   = p_src2;
-            denominator = calc_sqrt_reciprocal((const int64_t)denominator, q_x, &label_shift);  // 1/N
+        if (W->dtype_ == Int8) {
+            THINKER_RET_CHECK(API_LIB(scale_i8i8o16)(p_gamma, 1, p_weight_int16, T, 0), "luna_scale_i8i8o16");
+            THINKER_RET_CHECK(API_LIB(scale_i16i16o32)(p_weight_int16, 1, p_weight, T, 0), "luna_scale_i16i16o32");
+        }
+        else 
+            convert_4bitto32bit(p_weight, p_gamma, T);
+        THINKER_RET_CHECK(API_LIB(mul_i32i32o32)(p_y1, p_weight, p_y2, T, 0), "luna_mul_i32i32o32");
+        int32_t *p_bias = (int32_t *)p_beta;
+        if (2 != W->mem_.type_){
+            p_bias = (int32_t *)(p_tmp + T * sizeof(int32_t));
+            THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)p_bias, (int8_t *)p_beta, T * sizeof(int32_t)), "luna_memcpy_i8o8");
+        }
 
-            THINKER_RET_CHECK(API_LIB(scale_i8i8o32)(p_src_once, 1, p_numerator, T, 0), "luna_scale_i8i8o32");
-            THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(p_numerator, T, p_numerator, T, 0), "luna_scale_i32i32o32");                // T*x
-            THINKER_RET_CHECK(API_LIB(offset_i32i32o32)(p_numerator, (0 - sum_x_val), p_numerator, T, 0), "luna_offset_i32i32o32");
-            THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(p_numerator, denominator, (int32_t *)p_y1, T, label_shift), "luna_scale_i32i32o32");
+        THINKER_RET_CHECK(API_LIB(add_i32i32o8)(p_y2, p_bias, p_dst_once, T, shift), "luna_add_i32i32o32");
 
-            THINKER_RET_CHECK(API_LIB(scale_i8i8o32)(p_weight_tmp, 1, p_weight, T, 0), "luna_scale_i8i8o32");
-            THINKER_RET_CHECK(API_LIB(mul_i32i32o32)(p_y1, p_weight, p_y2, T, 0), "luna_mul_i32i32o32");
-            THINKER_RET_CHECK(API_LIB(add_i32i32o8)(p_y2, p_bias_tmp, p_dst_once, T, shift), "luna_add_i32i32o32");
-
-            if (Y->mem_.mem_type_ != 2) {
-            	opi_psram_cpy_out(p_dst + i * T, p_dst_once, T * sizeof(int8_t));
-            }
+        if (Y->mem_.mem_type_ != 2) {
+            opi_psram_cpy_out(p_dst + i * T, p_dst_once, T * sizeof(int8_t));
         }
     }
 

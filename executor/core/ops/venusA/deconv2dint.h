@@ -17,6 +17,15 @@
 #endif
 #include "thinker_status.h"
 
+// Quantization ceiling function
+static int32_t luna_quant_ceil(int32_t x, int32_t shift) {
+  if (x & ~(0xFFFFFFFF << shift)) {
+    return (x >> shift) + 1;
+  } else {
+    return (x >> shift);
+  }
+}
+
 /// Initialize deconvolution parameters
 static void deconv2dint_luna_para_init(ConvTranspose2dIntAttrs *attrs, conv_struct_t *conv_attrs, 
                                       tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y) {
@@ -71,11 +80,12 @@ static void deconv2dint_luna_para_init(ConvTranspose2dIntAttrs *attrs, conv_stru
 /// Main deconvolution function
 int32_t deconv2dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y, 
                        tTensor *Temp, ConvTranspose2dIntAttrs *attrs) {
-    int8_t *src = (int8_t *)(X->dptr_);
-    int8_t *weight = (int8_t *)(W->dptr_);
-    int32_t *bias = Bias ? (int32_t *)(Bias->dptr_) : NULL;
-    int8_t *dst = (int8_t *)(Y->dptr_);
-    int8_t *tmp = Temp ? (int8_t *)Temp->dptr_ : NULL;
+  int8_t *p_src   = (int8_t *)(X->dptr_);
+  int8_t *p_weight= (int8_t *)(W->dptr_);
+  int32_t *p_bias = Bias ? (int32_t *)(Bias->dptr_) : NULL;
+  int8_t *p_dst   = (int8_t *)(Y->dptr_);
+  int8_t *p_tmp   = Temp ? (int8_t *)Temp->dptr_ : NULL;
+  int32_t workspace_size = Temp ? Temp->shape_.dims_[0] : 0;
 
     if(X->dtype_ != Int8) return T_ERR_INVALID_DATATYPE;
 
@@ -89,25 +99,130 @@ int32_t deconv2dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y,
         return T_ERR_INVALID_PARA;
     }
 
+    int32_t in_is_psram = (X->mem_.type_ != 2) ? 1 : 0;
+    int32_t ou_is_psram = (Y->mem_.type_ != 2) ? 1 : 0;
     // Common deconvolution
     if(attrs->group == 1) {
-        THINKER_RET_CHECK(luna_split_conv_para_pack(&conv_attrs, &conv_static_para, LUNA_DECONV), "luna_split_conv_para_pack");
+        if (ou_is_psram) {
+            int32_t in_c = conv_attrs.input_c;
+            int32_t in_h = conv_attrs.input_h;
+            int32_t in_w = conv_attrs.input_w;
+            int32_t ou_c = conv_attrs.output_c;
+            int32_t ou_w = conv_attrs.output_w;
+            int32_t ou_h = conv_attrs.output_h;
+            int32_t k_h = conv_attrs.weight_h;
+            int32_t k_w = conv_attrs.weight_w;
+            int32_t s_h = conv_attrs.stride_h;
+            int32_t s_w = conv_attrs.stride_w;
+            int32_t pad_ht = conv_attrs.padding_h_up;
+            int32_t pad_hb = conv_attrs.padding_h_down;
+            int32_t ou_bits = conv_attrs.ou_bits;
+            uint32_t log2n_s_w = s_w >> 1;
+            uint32_t log2n_s_h = s_h >> 1;
 
-        // Determine output destination
-        dst = (Y->mem_.type_ != 2) ? tmp : dst;
+            uint32_t split_in_num = 1;
+            uint32_t tmp_in_h = in_h;
+            uint32_t in_without_h = (luna_quant_ceil(in_c, 3) << 3) * (luna_quant_ceil(in_w, 3 + log2n_s_w) << (3 + log2n_s_w));
 
-        // Execute deconvolution based on weight type
-        if(W->dtype_ == Int4)
-            THINKER_RET_CHECK(API_LIB(deconv2d_i8i4o8)(src, weight, bias, dst, &conv_static_para), "luna_deconv2d_i8i4o8");
-        else if(W->dtype_ == Int8)
-            THINKER_RET_CHECK(API_LIB(deconv2d_i8i8o8)(src, weight, bias, dst, &conv_static_para), "luna_deconv2d_i8i8o8");
+            int32_t overlap_num = luna_quant_ceil((k_h - 1), log2n_s_h);;
 
-        // Copy output to final destination if temporary buffer was used
-        if(Y->mem_.type_ != 2) {
-            opi_psram_cpy_out((int8_t *)Y->dptr_, dst, conv_attrs.output_c * conv_attrs.output_h * conv_attrs.output_w);
+            // if (cnn_layer_type < LUNA_CONV1D)	//CNN1D no support split
+            // {
+            int32_t tmp_ou_h_1st = ou_h;
+            int32_t tmp_ou_h_last = ou_h;
+            int32_t ou_without_h = ou_c * ou_w;
+            int32_t p_ht_1st = pad_ht;
+            int32_t p_ht	 = pad_ht;
+            if (0 == ((k_h - 1) & (s_h - 1)))
+            {
+              p_ht = s_h - 1;
+            }
+            else
+            {
+              p_ht = ((k_h - 1) & (s_h - 1)) - 1;
+            }
+            while ((tmp_in_h * in_without_h > CONV_IN_CONDITION) || (tmp_ou_h_1st * ou_without_h > CONV_IN_CONDITION) || (tmp_ou_h_last * ou_without_h > CONV_IN_CONDITION) || ((in_h % split_in_num) != 0))
+            {
+              split_in_num += 1;
+              tmp_in_h = in_h / split_in_num;
+              tmp_ou_h_1st = (tmp_in_h - 1) * s_h + 1 + p_ht_1st - k_h + 1;
+              tmp_ou_h_last = (tmp_in_h + overlap_num - 1) * s_h + 1 + p_ht + pad_hb - k_h + 1;
+              if ((split_in_num >= in_h) || (split_in_num >= ou_h))
+              {
+                break;
+              }
+            }
+            /////////////////check split condition////////////////
+            int32_t condition_1 = ((in_h % split_in_num) == 0);
+            int32_t condition_2 = (((in_h / split_in_num - 1) * s_h + 1) >= k_h);
+            if (!condition_1 || !condition_2 || ((1 == s_h) && (1 == s_w)) || ((tmp_in_h + overlap_num) * in_without_h > CONV_IN_CONDITION))
+            {
+              printf("[%s][%d]deconv input split invalid, split_num:%d \r\n", __func__, __LINE__, split_in_num);
+              return -1;
+            }
+
+            int32_t s_h_d = s_h;
+            int32_t s_w_d = s_w;
+            s_h = 1;
+            s_w = 1;
+            int32_t pad_ht_1st = pad_ht;
+            int32_t pad_ht_middle = 0;
+            if (0 == ((k_h - 1) & (s_h_d - 1)))
+            {
+                pad_ht_middle = s_h_d - 1;
+            }
+            else
+            {
+                pad_ht_middle = ((k_h - 1) & (s_h_d - 1)) - 1;
+            }
+          int32_t split_in_h = in_h / split_in_num;
+          int32_t skip_load_weight = 0;
+          int32_t one_channel_ou_offset = 0;
+          int32_t tmp_ou_h = ou_h;
+          if (split_in_num != 1) {
+            for (int32_t i = 0; i < split_in_num; i++) {
+              conv_attrs.reserved = skip_load_weight | ((i + 1) << 16);
+              skip_load_weight = 1 << 8;
+              THINKER_RET_CHECK(luna_split_conv_para_pack(&conv_attrs, &conv_static_para, LUNA_DECONV), "luna_split_conv_para_pack");
+              if (Int4 == W->dtype_)
+                THINKER_RET_CHECK(API_LIB(deconv2d_i8i4o8)(p_src, p_weight, p_bias, (int8_t *)p_tmp, &conv_static_para), "luna_deconv2d_i8i4o8");
+              else if (Int8 == W->dtype_)
+                THINKER_RET_CHECK(API_LIB(deconv2d_i8i8o8)(p_src, p_weight, p_bias, (int8_t *)p_tmp, &conv_static_para), "luna_deconv2d_i8i8o8");
+              if (i == 0) {
+                tmp_ou_h = (split_in_h - 1) * s_h_d - k_h + pad_ht_1st + 2;
+              }
+              else if(i == split_in_num - 1) {
+                tmp_ou_h = (split_in_h + overlap_num - 1) * s_h_d - k_h + pad_ht_middle + pad_hb + 2;
+              }
+              else
+                tmp_ou_h = (split_in_h + overlap_num - 1) * s_h_d - k_h + pad_ht_middle + 2;
+            //   tmp_ou_h = (i == split_in_num - 1) ? (ou_h - tmp_ou_h * (split_in_num - 1)) : split_in_h;
+              int32_t size = ou_w * tmp_ou_h * (0xF & Y->dtype_);
+              for (int32_t j = 0; j < ou_c; j++) {
+                opi_psram_cpy_out(p_dst + one_channel_ou_offset + j * ou_w * ou_h, p_tmp + j * size, size);
+              }
+              one_channel_ou_offset += size;
+            }
+          }
+          else {
+            THINKER_RET_CHECK(luna_split_conv_para_pack(&conv_attrs, &conv_static_para, LUNA_DECONV), "luna_split_conv_para_pack");
+            if (Int4 == W->dtype_)
+              THINKER_RET_CHECK(API_LIB(deconv2d_i8i4o8)(p_src, p_weight, p_bias, (int8_t *)p_tmp, &conv_static_para), "luna_deconv2d_i8i4o8");
+            else if (Int8 == W->dtype_)
+              THINKER_RET_CHECK(API_LIB(deconv2d_i8i8o8)(p_src, p_weight, p_bias, (int8_t *)p_tmp, &conv_static_para), "luna_deconv2d_i8i8o8");
+            opi_psram_cpy_out(p_dst, p_tmp, ou_c * ou_h * ou_w);
+          }
 #if !(defined(WIN32) || defined(linux))
-            HAL_FlushInvalidateDCache_by_Addr((uint32_t *)(Y->dptr_), conv_attrs.output_c * conv_attrs.output_h * conv_attrs.output_w);
+        	HAL_FlushInvalidateDCache_by_Addr((uint32_t *)(Y->dptr_), ou_c*ou_h*ou_w);
 #endif
+        }
+        else {
+          conv_attrs.reserved = 0;
+          THINKER_RET_CHECK(luna_split_conv_para_pack(&conv_attrs, &conv_static_para, LUNA_DECONV), "luna_split_conv_para_pack");
+          if (Int4 == W->dtype_)
+            THINKER_RET_CHECK(API_LIB(deconv2d_i8i4o8)(p_src, p_weight, p_bias, p_dst, &conv_static_para), "luna_deconv2d_i8i4o8");
+          else if (Int8 == W->dtype_)  
+            THINKER_RET_CHECK(API_LIB(deconv2d_i8i8o8)(p_src, p_weight, p_bias, p_dst, &conv_static_para), "luna_deconv2d_i8i8o8");
         }
     } else {
         return T_ERR_INVALID_PARA;

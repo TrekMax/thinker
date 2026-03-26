@@ -384,13 +384,13 @@ int32_t lstmint_luna(const tTensor *data, const tTensor *history_h, const tTenso
   int32_t seq_len = 0, batch_size = 0;
   if (params->layout == 0) {
     // T B D
-    seq_len     = data->shape_.dims_[1];
-    batch_size  = data->shape_.dims_[2];
+    seq_len     = data->shape_.dims_[0];
+    batch_size  = data->shape_.dims_[1];
   }
   else {
     // B T D
-    seq_len     = data->shape_.dims_[2];
-    batch_size  = data->shape_.dims_[1];
+    seq_len     = data->shape_.dims_[1];
+    batch_size  = data->shape_.dims_[0];
   }
   if (mask)
   {

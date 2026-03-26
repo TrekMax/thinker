@@ -125,7 +125,8 @@ int32_t conv2dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y, tTenso
   if ((k_h <= 12) && (k_w <= 12)) // kernel_size in [1, 12]
   {
       if (1 == attrs->group) { // common conv2d
-        // int32_t weight_size_align = (luna_quant_ceil(ou_c, 3) << 3) * (luna_quant_ceil(in_c, 2) << 2) * k_h * k_w; <=32KB
+        int32_t weight_size_align = (luna_quant_ceil(ou_c, 3) << 3) * (luna_quant_ceil(in_c, 2) << 2) * k_h * k_w; // <=32KB
+        bool is_split_weight = (weight_size_align  > 32768);
         if (ou_is_psram) {
           int32_t data_size_align_withouth =(luna_quant_ceil(in_c, 3) << 3) * 
           (luna_quant_ceil(in_w, (3 + log2n_stride_w)) << (3 + log2n_stride_w));
@@ -139,7 +140,7 @@ int32_t conv2dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y, tTenso
           if (split_in_num != 1) {
             for (int32_t i = 0; i < split_in_num; i++) {
               conv_attrs.reserved = skip_load_weight | ((i + 1) << 16);
-              skip_load_weight = 1 << 8;
+              skip_load_weight = is_split_weight ? 0 : 1 << 8;
               THINKER_RET_CHECK(luna_split_conv_para_pack(&conv_attrs, &conv_static_para, LUNA_CONV), "luna_split_conv_para_pack");
               if (Int4 == W->dtype_)
                 THINKER_RET_CHECK(API_LIB(conv2d_i8i4o8)(p_src, p_weight, p_bias, (int8_t *)p_tmp, &conv_static_para), "luna_conv2d_i8i4o8");
