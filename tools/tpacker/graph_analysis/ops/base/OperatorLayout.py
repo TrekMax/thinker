@@ -18,16 +18,44 @@ class LayoutPerfData:
 
 
 class BaseLayout(object):
-    """Base class for layout optimization and performance analysis."""
-    
+    """Base class for layout optimization and performance analysis.
+
+    Cost Model:
+    - Most operators support both NCHW and NCWH layouts
+    - NCHW is the default/canonical layout
+    - NCWH may have different performance characteristics
+    - Transpose operations have cost to discourage excessive layout changes
+    """
+
+    # High cost for operators that can't efficiently use NCWH layout
+    HIGH_COST_LAYOUT = 100000
+
     def get_layout_perf_venus(self, dynamic_shape) -> List[LayoutPerfData]:
-        """Get layout performance data for Venus platform."""
-        perf = LayoutPerfData()
+        """Get layout performance data for Venus platform.
+        Returns multiple layout options with their performance costs.
+        """
+        perfs = []
+
+        # NCHW layout - default, lowest cost
+        perf_nchw = LayoutPerfData()
+        perf_nchw.performance = 10  # Base cost
         for tensor in self.inputs:
-            perf.inputs_layout.append(Layout.NCHW)
+            perf_nchw.inputs_layout.append(Layout.NCHW)
         for tensor in self.outputs:
-            perf.outputs_layout.append(Layout.NCHW)
-        return [perf]
+            perf_nchw.outputs_layout.append(Layout.NCHW)
+        perfs.append(perf_nchw)
+
+        # NCWH layout - moderate cost for generic operators
+        # Most element-wise ops can handle both layouts with similar performance
+        perf_ncwh = LayoutPerfData()
+        perf_ncwh.performance = 15  # Slightly higher than NCHW
+        for tensor in self.inputs:
+            perf_ncwh.inputs_layout.append(Layout.NCWH)
+        for tensor in self.outputs:
+            perf_ncwh.outputs_layout.append(Layout.NCWH)
+        perfs.append(perf_ncwh)
+
+        return perfs
 
     def get_layout_perf(self, dynamic_shape) -> List[LayoutPerfData]:
         """Get layout performance data."""
@@ -94,7 +122,7 @@ class ConvLayout(BaseLayout):
                     perf.inputs_layout.append(Layout.NCWH)
                 for tensor in self.outputs:
                     perf.outputs_layout.append(Layout.NCWH)
-                perf.performance = 5
+                perf.performance = 5  # NCWH is better for this case
             elif align_data_size_nchw <= threshold:
                 for tensor in self.inputs:
                     perf.inputs_layout.append(Layout.NCHW)
@@ -102,7 +130,29 @@ class ConvLayout(BaseLayout):
                     perf.outputs_layout.append(Layout.NCHW)
             else:
                 raise ValueError("Unsupported data size configuration!")
+
         perfs.append(perf)
+
+        # Add alternative layout option for beam search exploration
+        current_layout = perf.inputs_layout[0] if perf.inputs_layout else Layout.NCHW
+
+        alt_perf = LayoutPerfData()
+        if current_layout == Layout.NCHW:
+            # Add NCWH as alternative - conv can handle both
+            alt_perf.performance = 8  # Slightly lower than NCHW to encourage NCWH when beneficial
+            for tensor in self.inputs:
+                alt_perf.inputs_layout.append(Layout.NCWH)
+            for tensor in self.outputs:
+                alt_perf.outputs_layout.append(Layout.NCWH)
+        else:
+            # Add NCHW as alternative
+            alt_perf.performance = 10
+            for tensor in self.inputs:
+                alt_perf.inputs_layout.append(Layout.NCHW)
+            for tensor in self.outputs:
+                alt_perf.outputs_layout.append(Layout.NCHW)
+
+        perfs.append(alt_perf)
         return perfs
 
 

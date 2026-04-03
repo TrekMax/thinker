@@ -25,7 +25,7 @@ int32_t iqadd_luna(tTensor *X1, tTensor *X2, tTensor *Temp, tTensor *Y) {
     // Check if tensors have the same shape and data type
     if (!equalShape(&X1->shape_, &X2->shape_) || 
         X1->dtype_ != X2->dtype_ || 
-        X1->dtype_ != Y->dtype_)
+        X1->dtype_ != Y->dtype_ || X1->dtype_ != Int8)
     {
         return T_ERR_INVALID_DATATYPE;
     }
@@ -46,159 +46,189 @@ int32_t iqadd_luna(tTensor *X1, tTensor *X2, tTensor *Temp, tTensor *Y) {
     int32_t shift2 = (int32_t)X2->scale_ - (int32_t)Y->scale_;
 
     int32_t past_size = 0;
-    switch (X1->dtype_)
+    int32_t workspace_size = Temp ? Temp->shape_.dims_[0] : 0;
+    int8_t *workspace = Temp ? (int8_t *)Temp->dptr_ : NULL;
+
+    // Branch 1: Simple case - no scale conversion needed
+    if ((!x1_in_psram) && (!x2_in_psram) && (shift1 == 0) && (shift2 == 0))
     {
-        case Int8:
-        {
-            int32_t workspace_size = Temp ? Temp->shape_.dims_[0] : 0;
-            int8_t *workspace = Temp ? (int8_t *)Temp->dptr_ : NULL;
-            int8_t *dst_temp = y_in_psram ? workspace : (int8_t *)dst;
-            if ((x1_in_psram == x2_in_psram) && (shift1 == 0) && (shift2 == 0))
-            {
-                THINKER_RET_CHECK(API_LIB(add_i8i8o8)((const int8_t *)src1, (int8_t *)src2, (int8_t *)dst, total_size, 0), "luna_add_i8i8o8");
-            }
-            else if ((shift1 != 0) && (shift2 == 0) && (!x2_in_psram))
-            {
-                if (!y_in_psram) {
-                    int8_t *src1_temp = dst_temp;
-                    THINKER_RET_CHECK(API_LIB(scale_i8i8o8)((int8_t *)src1, 1, (int8_t *)src1_temp, total_size, shift1), "luna_scale_i8i8o8");
-                    THINKER_RET_CHECK(API_LIB(add_i8i8o8)((const int8_t *)src1_temp, (int8_t *)src2, (int8_t *)dst, total_size, 0), "luna_add_i8i8o8");
-                }
-                else {
-                    while (past_size < total_size)
-                    {
-                        int32_t remain_size = total_size - past_size;
-                        int32_t cur_size = workspace_size < remain_size ? workspace_size : remain_size;
+        // All in share-memory: direct operation
+        int8_t *dst_temp = y_in_psram ? (int8_t *)workspace : (int8_t *)dst;
+        THINKER_RET_CHECK(API_LIB(add_i8i8o8)((const int8_t *)src1, (int8_t *)src2, (int8_t *)dst_temp, total_size, 0), "luna_add_i8i8o8");
+        if (y_in_psram)
+            opi_psram_cpy_out((void *)dst, dst_temp, total_size * sizeof(int8_t));
+    }
+    else if (((x1_in_psram) || (shift1 != 0)) && (!x2_in_psram) && (shift2 == 0))
+    {
+        if (y_in_psram) {
+            if (workspace_size <= 0)
+                return T_ERR_NO_WORKSPACE;
+            while (past_size < total_size) {
+                int32_t remain_size = total_size - past_size;
+                int32_t cur_size = workspace_size < remain_size ? workspace_size : remain_size;
 
-                        int8_t *src1_temp = dst_temp;
-                        THINKER_RET_CHECK(API_LIB(scale_i8i8o8)((int8_t *)src1 + past_size, 1, (int8_t *)src1_temp, cur_size, shift1), "luna_scale_i8i8o8");
+                int8_t *dst_temp = workspace;
+                int8_t *src1_temp = (int8_t *)src1 + past_size;
+                int8_t *src2_temp = (int8_t *)src2 + past_size;
+                if (x1_in_psram) {
+                    src1_temp = dst_temp;
+                    THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)src1_temp, (int8_t *)src1 + past_size, cur_size), "luna_memcpy_i8o8");
+                }
 
-                        int8_t *src2_temp = (int8_t *)src2 + past_size;
-                        THINKER_RET_CHECK(API_LIB(add_i8i8o8)((int8_t *)src1_temp, (int8_t *)src2_temp, (int8_t *)dst_temp, cur_size, 0), "luna_add_i8i8o8");
-                        opi_psram_cpy_out((void *)dst + past_size, dst_temp, cur_size * sizeof(int8_t));
-                        past_size += cur_size;
-                    }
+                if (shift1 != 0) {
+                    uint32_t shift1_0 = shift1 < 0 ? 1UL << -shift1 : 1;
+                    uint32_t shift1_1 = shift1 < 0 ? 0 : shift1;
+                    THINKER_RET_CHECK(API_LIB(scale_i8i8o8)(src1_temp, shift1_0, (int8_t *)dst_temp, cur_size, shift1_1), "luna_scale_i8i8o8");
+                    src1_temp = dst_temp;
                 }
-            }
-            else if ((shift1 == 0) && (shift2 != 0) && (!x1_in_psram))
-            {
-                if (!y_in_psram) {
-                    int8_t *src2_temp = dst_temp;
-                    THINKER_RET_CHECK(API_LIB(scale_i8i8o8)((int8_t *)src2, 1, (int8_t *)src2_temp, total_size, shift2), "luna_scale_i8i8o8");
-                    THINKER_RET_CHECK(API_LIB(add_i8i8o8)((const int8_t *)src1, (int8_t *)src2_temp, (int8_t *)dst, total_size, 0), "luna_add_i8i8o8");
-                }
-                else {
-                    while (past_size < total_size)
-                    {
-                        int32_t remain_size = total_size - past_size;
-                        int32_t cur_size = workspace_size < remain_size ? workspace_size : remain_size;
 
-                        int8_t *src1_temp = (int8_t *)src1 + past_size;
-                        int8_t *src2_temp = dst_temp;
-                        THINKER_RET_CHECK(API_LIB(scale_i8i8o8)((int8_t *)src2 + past_size, 1, (int8_t *)src2_temp, cur_size, shift1), "luna_scale_i8i8o8");
-                        THINKER_RET_CHECK(API_LIB(add_i8i8o8)((int8_t *)src1_temp, (int8_t *)src2_temp, (int8_t *)dst_temp, cur_size, 0), "luna_add_i8i8o8");
-                        opi_psram_cpy_out((void *)dst + past_size, dst_temp, cur_size * sizeof(int8_t));
-                        past_size += cur_size;
-                    }
-                }
+                THINKER_RET_CHECK(API_LIB(add_i8i8o8)((int8_t *)src1_temp, (int8_t *)src2_temp, (int8_t *)dst_temp, cur_size, 0), "luna_add_i8i8o8");
+                opi_psram_cpy_out((void *)dst + past_size, dst_temp, cur_size * sizeof(int8_t));
+                past_size += cur_size;
             }
-            else
-            {
-                int32_t factor = y_in_psram ? 1 : 0;
-                while (past_size < total_size)
-                {
-                    int32_t remain_size = total_size - past_size;
-                    int32_t cur_size = (workspace_size >> factor) < remain_size ? (workspace_size >> factor) : remain_size;
-
-                    int8_t *src1_temp = dst_temp;
-                    THINKER_RET_CHECK(API_LIB(scale_i8i8o8)((int8_t *)src1 + past_size, 1, (int8_t *)src1_temp, cur_size, shift1), "luna_scale_i8i8o8");
-                    int8_t *src2_temp = y_in_psram ? (workspace + cur_size) : workspace;
-                    THINKER_RET_CHECK(API_LIB(scale_i8i8o8)((int8_t *)src2 + past_size, 1, (int8_t *)src2_temp, cur_size, shift2), "luna_scale_i8i8o8");
-                    THINKER_RET_CHECK(API_LIB(add_i8i8o8)((int8_t *)src1_temp, (int8_t *)src2_temp, (int8_t *)dst_temp, cur_size, 0), "luna_add_i8i8o8");
-                    if (y_in_psram)
-                        opi_psram_cpy_out((void *)dst + past_size, dst_temp, cur_size * sizeof(int8_t));
-                    past_size += cur_size;
-                }
-            }
-            break;
         }
-
-        case Int32: {
-            int32_t workspace_size = Temp ? Temp->shape_.dims_[0] >> 2 : 0;
-            int32_t *workspace = Temp ? (int32_t *)Temp->dptr_ : NULL;
-            int32_t *dst_temp = y_in_psram ? workspace : (int32_t *)dst;
-            if ((x1_in_psram == x2_in_psram) && (shift1 == 0) && (shift2 == 0))
-            {
-                THINKER_RET_CHECK(API_LIB(add_i32i32o32)((const int32_t *)src1, (int32_t *)src2, (int32_t *)dst, total_size, 0), "luna_add_i32i32o32");
+        else {
+            int8_t *src1_temp = (int8_t *)src1;
+            int8_t *src2_temp = (int8_t *)src2;
+            if (x1_in_psram) {
+                src1_temp = (int8_t *)dst;
+                THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)src1_temp, (int8_t *)src1, total_size), "luna_memcpy_i8o8");
             }
-            else if ((shift1 != 0) && (shift2 == 0) && (!x2_in_psram))
-            {
-                if (!y_in_psram) {
-                    int32_t *src1_temp = dst_temp;
-                    THINKER_RET_CHECK(API_LIB(scale_i32i32o32)((int32_t *)src1, 1, (int32_t *)src1_temp, total_size, shift1), "luna_scale_i32i32o32");
-                    THINKER_RET_CHECK(API_LIB(add_i32i32o32)((const int32_t *)src1_temp, (int32_t *)src2, (int32_t *)dst, total_size, 0), "luna_add_i32i32o32");
-                }
-                else {
-                    while (past_size < total_size)
-                    {
-                        int32_t remain_size = total_size - past_size;
-                        int32_t cur_size = workspace_size < remain_size ? workspace_size : remain_size;
 
-                        int32_t *src1_temp = dst_temp;
-                        THINKER_RET_CHECK(API_LIB(scale_i32i32o32)((int32_t *)src1 + past_size, 1, (int32_t *)src1_temp, cur_size, shift1), "luna_scale_i32i32o32");
-
-                        int32_t *src2_temp = (int32_t *)src2 + past_size;
-                        THINKER_RET_CHECK(API_LIB(add_i32i32o32)((int32_t *)src1_temp, (int32_t *)src2_temp, (int32_t *)dst_temp, cur_size, 0), "luna_add_i32i32o32");
-                        opi_psram_cpy_out((void *)dst + past_size, dst_temp, cur_size * sizeof(int32_t));
-                        past_size += cur_size;
-                    }
-                }
+            if (shift1 != 0) {
+                uint32_t shift1_0 = shift1 < 0 ? 1UL << -shift1 : 1;
+                uint32_t shift1_1 = shift1 < 0 ? 0 : shift1;
+                THINKER_RET_CHECK(API_LIB(scale_i8i8o8)(src1_temp, shift1_0, (int8_t *)dst, total_size, shift1_1), "luna_scale_i8i8o8");
+                src1_temp = (int8_t *)dst;
             }
-            else if ((shift1 == 0) && (shift2 != 0) && (!x1_in_psram))
-            {
-                if (!y_in_psram) {
-                    int32_t *src2_temp = dst_temp;
-                    THINKER_RET_CHECK(API_LIB(scale_i32i32o32)((int32_t *)src2, 1, (int32_t *)src2_temp, total_size, shift1), "luna_scale_i32i32o32");
-                    THINKER_RET_CHECK(API_LIB(add_i32i32o32)((const int32_t *)src1, (int32_t *)src2_temp, (int32_t *)dst, total_size, 0), "luna_add_i32i32o32");
-                }
-                else {
-                    while (past_size < total_size)
-                    {
-                        int32_t remain_size = total_size - past_size;
-                        int32_t cur_size = workspace_size < remain_size ? workspace_size : remain_size;
 
-                        int32_t *src1_temp = (int32_t *)src1 + past_size;
-                        int32_t *src2_temp = dst_temp;
-                        THINKER_RET_CHECK(API_LIB(scale_i32i32o32)((int32_t *)src2 + past_size, 1, (int32_t *)src2_temp, cur_size, shift1), "luna_scale_i32i32o32");
-                        THINKER_RET_CHECK(API_LIB(add_i32i32o32)((int32_t *)src1_temp, (int32_t *)src2_temp, (int32_t *)dst_temp, cur_size, 0), "luna_add_i32i32o32");
-                        opi_psram_cpy_out((void *)dst + past_size, dst_temp, cur_size * sizeof(int32_t));
-                        past_size += cur_size;
-                    }
-                }
-            }
-            else
-            {
-                int32_t factor = y_in_psram ? 1 : 0;
-                while (past_size < total_size)
-                {
-                    int32_t remain_size = total_size - past_size;
-                    int32_t cur_size = (workspace_size >> factor) < remain_size ? (workspace_size >> factor) : remain_size;
-
-                    int32_t *src1_temp = dst_temp;
-                    THINKER_RET_CHECK(API_LIB(scale_i32i32o32)((int32_t *)src1 + past_size, 1, (int32_t *)src1_temp, cur_size, shift1), "luna_scale_i32i32o32");
-                    int32_t *src2_temp = y_in_psram ? (workspace + cur_size) : workspace;
-                    THINKER_RET_CHECK(API_LIB(scale_i32i32o32)((int32_t *)src2 + past_size, 1, (int32_t *)src2_temp, cur_size, shift2), "luna_scale_i32i32o32");
-                    THINKER_RET_CHECK(API_LIB(add_i32i32o32)((int32_t *)src1_temp, (int32_t *)src2_temp, (int32_t *)dst_temp, cur_size, 0), "luna_add_i32i32o32");
-                    if (y_in_psram)
-                        opi_psram_cpy_out((void *)dst + past_size, dst_temp, cur_size * sizeof(int32_t));
-                    past_size += cur_size;
-                }
-            }
-            break;
+            THINKER_RET_CHECK(API_LIB(add_i8i8o8)((int8_t *)src1_temp, (int8_t *)src2_temp, (int8_t *)dst, total_size, 0), "luna_add_i8i8o8");
         }
+    }
+    // Branch 2: Need to scale X1, X2 is ready (in share-memory, no scale)
+    else if ((!x1_in_psram) && (shift1 == 0) && ((x2_in_psram) || (shift2 != 0)))
+    {
+        if (y_in_psram) {
+            if (workspace_size <= 0)
+                return T_ERR_NO_WORKSPACE;
+            while (past_size < total_size) {
+                int32_t remain_size = total_size - past_size;
+                int32_t cur_size = workspace_size < remain_size ? workspace_size : remain_size;
 
-        default:
-            return T_ERR_INVALID_DATATYPE;
+                int8_t *dst_temp = workspace;
+                int8_t *src1_temp = (int8_t *)src1 + past_size;
+                int8_t *src2_temp = (int8_t *)src2 + past_size;
+                if (x2_in_psram) {
+                    src2_temp = dst_temp;
+                    THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)src2_temp, (int8_t *)src2 + past_size, cur_size), "luna_memcpy_i8o8");
+                }
+
+                if (shift2 != 0) {
+                    uint32_t shift2_0 = shift2 < 0 ? 1UL << -shift2 : 1;
+                    uint32_t shift2_1 = shift2 < 0 ? 0 : shift2;
+                    THINKER_RET_CHECK(API_LIB(scale_i8i8o8)(src2_temp, shift2_0, (int8_t *)dst_temp, cur_size, shift2_1), "luna_scale_i8i8o8");
+                    src2_temp = dst_temp;
+                }
+
+                THINKER_RET_CHECK(API_LIB(add_i8i8o8)((int8_t *)src1_temp, (int8_t *)src2_temp, (int8_t *)dst_temp, cur_size, 0), "luna_add_i8i8o8");
+                opi_psram_cpy_out((void *)dst + past_size, dst_temp, cur_size * sizeof(int8_t));
+                past_size += cur_size;
+            }
+        }
+        else {
+            int8_t *src1_temp = (int8_t *)src1;
+            int8_t *src2_temp = (int8_t *)src2;
+            if (x2_in_psram) {
+                THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)dst, (int8_t *)src2, total_size), "luna_memcpy_i8o8");
+                src2_temp = (int8_t *)dst;
+            }
+
+            if (shift2 != 0) {
+                uint32_t shift2_0 = shift2 < 0 ? 1UL << -shift2 : 1;
+                uint32_t shift2_1 = shift2 < 0 ? 0 : shift2;
+                THINKER_RET_CHECK(API_LIB(scale_i8i8o8)(src2_temp, shift2_0, (int8_t *)dst, total_size, shift2_1), "luna_scale_i8i8o8");
+                src2_temp = (int8_t *)dst;
+            }
+
+            THINKER_RET_CHECK(API_LIB(add_i8i8o8)((int8_t *)src1_temp, (int8_t *)src2_temp, (int8_t *)dst, total_size, 0), "luna_add_i8i8o8");
+        }
+    }
+    else {
+        if (workspace_size <= 0)
+            return T_ERR_NO_WORKSPACE;
+        if (y_in_psram) {
+            while (past_size < total_size) {
+                int32_t remain_size = total_size - past_size;
+                int32_t cur_size = (workspace_size >> 1) < remain_size ? (workspace_size >> 1) : remain_size;
+
+                int8_t *dst_temp = workspace;
+                int8_t *src1_temp = (int8_t *)src1 + past_size;
+                int8_t *src2_temp = (int8_t *)src2 + past_size;
+                if (x1_in_psram) {
+                    src1_temp = (int8_t *)dst_temp;
+                    THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)src1_temp, (int8_t *)src1 + past_size, cur_size), "luna_memcpy_i8o8");
+                }
+
+                if (shift1 != 0) {
+                    uint32_t shift1_0 = shift1 < 0 ? 1UL << -shift1 : 1;
+                    uint32_t shift1_1 = shift1 < 0 ? 0 : shift1;
+                    THINKER_RET_CHECK(API_LIB(scale_i8i8o8)(src1_temp, shift1_0, (int8_t *)dst_temp, cur_size, shift1_1), "luna_scale_i8i8o8");
+                    src1_temp = dst_temp;
+                }
+
+                if (x2_in_psram) {
+                    src2_temp = (int8_t *)dst_temp + cur_size;
+                    THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)src2_temp, (int8_t *)src2 + past_size, cur_size), "luna_memcpy_i8o8");
+                }
+
+                if (shift2 != 0) {
+                    uint32_t shift2_0 = shift2 < 0 ? 1UL << -shift2 : 1;
+                    uint32_t shift2_1 = shift2 < 0 ? 0 : shift2;
+                    THINKER_RET_CHECK(API_LIB(scale_i8i8o8)(src2_temp, shift2_0, (int8_t *)dst_temp + cur_size, cur_size, shift2_1), "luna_scale_i8i8o8");
+                    src2_temp = (int8_t *)dst_temp + cur_size;
+                }
+
+                THINKER_RET_CHECK(API_LIB(add_i8i8o8)((int8_t *)src1_temp, (int8_t *)src2_temp, (int8_t *)dst_temp, cur_size, 0), "luna_add_i8i8o8");
+                opi_psram_cpy_out((void *)dst + past_size, dst_temp, cur_size * sizeof(int8_t));
+                past_size += cur_size;
+            }
+        }
+        else {
+            while (past_size < total_size) {
+                int32_t remain_size = total_size - past_size;
+                int32_t cur_size = (workspace_size >> 1) < remain_size ? (workspace_size >> 1) : remain_size;
+
+                int8_t *dst_temp = (int8_t *)dst + past_size;
+                int8_t *src1_temp = (int8_t *)src1 + past_size;
+                int8_t *src2_temp = (int8_t *)src2 + past_size;
+                if (x1_in_psram) {
+                    src1_temp = (int8_t *)dst_temp;
+                    THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)src1_temp, (int8_t *)src1 + past_size, cur_size), "luna_memcpy_i8o8");
+                }
+
+                if (shift1 != 0) {
+                    uint32_t shift1_0 = shift1 < 0 ? 1UL << -shift1 : 1;
+                    uint32_t shift1_1 = shift1 < 0 ? 0 : shift1;
+                    THINKER_RET_CHECK(API_LIB(scale_i8i8o8)(src1_temp, shift1_0, (int8_t *)dst_temp, cur_size, shift1_1), "luna_scale_i8i8o8");
+                    src1_temp = dst_temp;
+                }
+
+                if (x2_in_psram) {
+                    src2_temp = (int8_t *)workspace;
+                    THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)src2_temp, (int8_t *)src2 + past_size, cur_size), "luna_memcpy_i8o8");
+                }
+
+                if (shift2 != 0) {
+                    uint32_t shift2_0 = shift2 < 0 ? 1UL << -shift2 : 1;
+                    uint32_t shift2_1 = shift2 < 0 ? 0 : shift2;
+                    THINKER_RET_CHECK(API_LIB(scale_i8i8o8)(src2_temp, shift2_0, (int8_t *)workspace, cur_size, shift2_1), "luna_scale_i8i8o8");
+                    src2_temp = (int8_t *)workspace;
+                }
+
+                THINKER_RET_CHECK(API_LIB(add_i8i8o8)((int8_t *)src1_temp, (int8_t *)src2_temp, (int8_t *)dst_temp, cur_size, 0), "luna_add_i8i8o8");
+                past_size += cur_size;
+            }
+        }
     }
 
     return T_SUCCESS;

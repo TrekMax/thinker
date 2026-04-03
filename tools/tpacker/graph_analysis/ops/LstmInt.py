@@ -138,8 +138,8 @@ class LSTMInt(Operator):
         workspace_size = hidden_size * 4 * 8
         platform = self.attrs.get("platform", "venus")
 
-        # if platform in {"arcs", "venusA"}:
-            # workspace_size += h2h_weight.nbytes + i2h_weight.nbytes + i2h_bias.nbytes + h2h_bias.nbytes
+        if platform in {"arcs", "venusA"}:
+            workspace_size += h2h_weight.nbytes + i2h_weight.nbytes + i2h_bias.nbytes + h2h_bias.nbytes
             # workspace_size += i2h_bias.nbytes + h2h_bias.nbytes
 
         if workspace_size != 0:

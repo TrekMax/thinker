@@ -1,3 +1,4 @@
+import ast
 import math
 import sympy
 from enum import Enum
@@ -94,9 +95,12 @@ def attr2tuple(value, default, dim=None):
     if value is None:
         return tuple(int(default) for _ in range(dim)) if isinstance(default, int) else tuple(int(default[i]) for i in range(dim))
     
-    # Convert string to integer
+    # Convert string to integer (safe parsing)
     if isinstance(value, str):
-        value = eval(value)
+        try:
+            value = ast.literal_eval(value)
+        except (ValueError, SyntaxError):
+            pass  # Keep as string if not a number
     
     # Handle different types
     if isinstance(value, int):
@@ -164,22 +168,24 @@ def clip(v, min_v, max_v):
     return min(max(v, min_v), max_v)
 
 def combine4bit_8bit(x):
-    """Combine 4-bit integers into 8-bit integers."""
+    """Combine 4-bit integers into 8-bit integers (vectorized)."""
     if not (-8 <= x.min() and x.max() < 8):
         raise ValueError("Input must be 4-bit integers (-8 to 7)")
-    
+
     x = x.squeeze()
     new_x = x.reshape(-1, x.shape[-1])
-    shape = list(new_x.shape)
-    shape[-1] = (shape[-1] + 1) // 2  # Ceiling division
-    
-    combined = np.zeros(shape, dtype=np.int8)
-    
+
     # Handle odd length by padding with zero
     if new_x.shape[-1] % 2 != 0:
         new_x = np.concatenate([new_x, np.zeros((new_x.shape[0], 1), dtype=np.int8)], axis=1)
-    
-    for i in range(shape[-1]):
-        combined[:, i] = (new_x[:, 2 * i + 1] << 4) | (new_x[:, 2 * i] & 0x0F)
-    
+
+    # Vectorized combination: reshape to pairs and combine
+    # Split into even and odd indices using slicing
+    n_pairs = (new_x.shape[-1] + 1) // 2
+    even = new_x[:, :n_pairs * 2: 2]  # 0, 2, 4, ...
+    odd = new_x[:, 1:n_pairs * 2: 2]   # 1, 3, 5, ...
+
+    # Combine: high nibble = odd, low nibble = even
+    combined = (odd << 4).astype(np.int8) | (even & 0x0F)
+
     return combined

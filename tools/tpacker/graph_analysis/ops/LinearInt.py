@@ -49,7 +49,7 @@ class LinearInt(Operator):
         w_shape = list(W.shape)
 
         assert X.dtype in (np.int8,), "Input must be of type int8"
-        assert W.dtype in (np.int8), "Weight must be of type int8"
+        assert W.dtype in (np.int8,), "Weight must be of type int8"
         assert len(inputs) in {2, 3}, "LinearInt operator must have 2 or 3 inputs"
 
         # Calculate input dimensions
@@ -136,8 +136,8 @@ class LinearInt(Operator):
             input_size = M * N
             output_size = M * L
 
-            if output.dtype == np.int8:
-                if output.mem_type != MemType.SHARE:
+            if out.dtype == np.int8:
+                if out.mem_type != MemType.SHARE_MEM:
                     if ALIGN4(L) * ALIGN8(M) <= 65536: 
                         workspace_size = input_size + output_size
                     else:
@@ -147,8 +147,8 @@ class LinearInt(Operator):
                         workspace_size = 0
                     else:
                         workspace_size = input_size + output_size
-            elif output.dtype == np.int16:
-                if output.mem_type != MemType.SHARE:
+            elif out.dtype == np.int16:
+                if out.mem_type != MemType.SHARE_MEM:
                     if ALIGN4(L) * ALIGN8(M) <= 65536: 
                         workspace_size = ALIGN2(input_size) + output_size * 2
                     else:
@@ -159,7 +159,7 @@ class LinearInt(Operator):
                     else:
                         workspace_size = ALIGN2(input_size) + output_size * 2
             else:
-                if output.mem_type != MemType.SHARE:
+                if out.mem_type != MemType.SHARE_MEM:
                     if ALIGN4(L) * ALIGN8(M) <= 65536: 
                         workspace_size = ALIGN4(input_size) + output_size * 4
                     else:
@@ -216,15 +216,17 @@ class LinearInt(Operator):
         shape       = weight_data.shape
         platform = self.attrs.get("platform", "venus")
 
-        assert self.attrs['transB'] == 1, "Only support transB=1"
         if platform in {"arcs", "venusA"}:
+            assert self.attrs['transB'] == 1, "Only support transB=1"
             if weight_bits == 4:
                 new_weight_data = combine4bit_8bit(weight_data)
             else:
                 new_weight_data = weight_data
             self.inputs[1].update(data=new_weight_data, shape=shape, bits=np.float32(weight_bits / 8), layout=layout)
         elif platform == "venus":
-            new_weight_data = weight_data.transpose(1, 0)
+            if self.attrs["transB"] == 1:
+                new_weight_data = weight_data.transpose(1, 0)
+                self.attrs['transB'] = 0
             shape = new_weight_data.shape
             if layout == Layout.NCHW:
                 self.inputs[1].update(data=new_weight_data, shape=shape, layout=Layout.NCWH)
