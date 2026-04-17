@@ -45,18 +45,33 @@ class Slice(Operator):
         axes = axes + len(shape) if axes < 0 else axes
 
         # Adjust starts and ends for negative values
+        dim_size = shape[axes]
         if not is_sympy(starts):
-            starts = starts + shape[axes] if starts < 0 else starts
-            starts = max(starts, 0)
+            starts = starts + dim_size if starts < 0 else starts
+            starts = max(0, min(starts, dim_size - 1)) if steps < 0 else max(0, min(starts, dim_size))
         if not is_sympy(ends):
-            ends = ends + shape[axes] if ends < 0 else ends
-            ends = min(ends, shape[axes])
+            if ends < 0:
+                ends_adjusted = ends + dim_size
+                # For negative step: if ends + dim_size < 0, select all elements
+                if steps < 0 and ends_adjusted < 0:
+                    shape[axes] = starts + 1
+                else:
+                    ends = ends_adjusted if ends_adjusted > 0 else 0
+            # For positive step: clamp to valid range
+            if steps > 0:
+                ends = max(0, min(ends, dim_size))
 
         # Calculate output shape
         if steps < 0:
-            shape[axes] = (starts - ends + 1 + steps) // (-steps)
+            if starts < ends:
+                shape[axes] = 0
+            else:
+                shape[axes] = max(0, starts - ends)
         else:
-            shape[axes] = (ends - starts + steps - 1) // steps
+            if starts >= ends:
+                shape[axes] = 0
+            else:
+                shape[axes] = (ends - starts + steps - 1) // steps
 
         # Create output tensor
         Y = X.clone(shape=tuple(shape))

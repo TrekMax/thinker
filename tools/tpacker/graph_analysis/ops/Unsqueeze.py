@@ -28,7 +28,7 @@ class Unsqueeze(Operator):
         X = inputs[0]
 
         tShape = list(X.shape)
-        axes = self.attrs["axes"]
+        axes = list(self.attrs["axes"])
         rank = len(tShape) + len(axes)
 
         # Validate and adjust axes

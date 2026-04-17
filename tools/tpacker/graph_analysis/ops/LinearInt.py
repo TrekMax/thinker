@@ -137,38 +137,39 @@ class LinearInt(Operator):
             output_size = M * L
 
             if out.dtype == np.int8:
+                workspace_size = input_size
                 if out.mem_type != MemType.SHARE_MEM:
                     if ALIGN4(L) * ALIGN8(M) <= 65536: 
                         workspace_size = input_size + output_size
                     else:
-                        workspace_size = output_size * 2
+                        workspace_size = output_size + max(input_size, output_size)
                 else:
                     if ALIGN4(L) * ALIGN8(M) <= 65536: 
-                        workspace_size = 0
+                        workspace_size = input_size
                     else:
                         workspace_size = input_size + output_size
             elif out.dtype == np.int16:
                 if out.mem_type != MemType.SHARE_MEM:
-                    if ALIGN4(L) * ALIGN8(M) <= 65536: 
-                        workspace_size = ALIGN2(input_size) + output_size * 2
+                    if ALIGN4(L) * ALIGN4(M) <= 65536: 
+                        workspace_size = (input_size + output_size) * 2
                     else:
-                        workspace_size = output_size * 4
+                        workspace_size = (output_size + max(input_size, output_size)) * 2
                 else:
-                    if ALIGN4(L) * ALIGN8(M) <= 65536: 
-                        workspace_size = 0
+                    if ALIGN4(L) * ALIGN4(M) <= 65536: 
+                        workspace_size = input_size * 2
                     else:
-                        workspace_size = ALIGN2(input_size) + output_size * 2
+                        workspace_size = (input_size + output_size) * 2
             else:
                 if out.mem_type != MemType.SHARE_MEM:
-                    if ALIGN4(L) * ALIGN8(M) <= 65536: 
-                        workspace_size = ALIGN4(input_size) + output_size * 4
+                    if ALIGN2(L) * ALIGN4(M) <= 32768: 
+                        workspace_size = (input_size + output_size) * 4
                     else:
-                        workspace_size = output_size * 8
+                        workspace_size = (output_size + max(input_size, output_size)) * 4
                 else:
-                    if ALIGN4(L) * ALIGN8(M) <= 65536: 
-                        workspace_size = 0
+                    if ALIGN2(L) * ALIGN4(M) <= 32768: 
+                        workspace_size = input_size * 4
                     else:
-                        workspace_size = ALIGN4(input_size) + output_size * 4
+                        workspace_size = (input_size + output_size) * 4
         elif platform == "venus":
             if len(self.inputs) > 2:
                 workspace_size = out.nbytes * self.inputs[2].dtype.itemsize

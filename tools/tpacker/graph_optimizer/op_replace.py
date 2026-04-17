@@ -8,8 +8,50 @@ from ..graph import Graph, GraphNode, Tensor, ConstantEntry
 
 node_list = ["Conv2dInt", "ConvTranspose2dInt"]
 
+def check_same_pads(dst_nodes, is_stream):
+    """
+    检查所有分支的pad参数是否相同
+    Args:
+        dst_nodes: 目标节点列表
+        is_stream: split_w 或 split_h
+    Returns:
+        True 如果所有分支pad相同, False 否则
+    """
+    conv_nodes = [n for n in dst_nodes if n.op_type == "Conv2dInt"]
+    if len(conv_nodes) <= 1:
+        return True
+
+    pads_list = []
+    for n in conv_nodes:
+        pads = list(n.attrs.get('pads', []))
+        pads_list.append(tuple(pads))
+
+    # 检查是否所有 pad 都相同
+    return len(set(pads_list)) == 1
+
+def get_conv_branches(graph):
+    """
+    收集图中所有存在分叉的输入及其对应的Conv2dInt节点
+    Returns:
+        dict: {input_entry: [Conv2dInt节点列表]}
+    """
+    branch_map = {}
+    for node in graph.nodes.values():
+        if node.op_type == "Conv2dInt" and len(node.inputs) > 0:
+            input_entry = node.inputs[0]
+            if input_entry and input_entry.src_node is not None:
+                src_output = input_entry.src_node.outputs[0]
+                if len(src_output.dst_nodes) > 1:
+                    # 存在分叉：多个节点使用同一个输入
+                    if input_entry not in branch_map:
+                        branch_map[input_entry] = []
+                    branch_map[input_entry].append(node)
+    return branch_map
+
 def split_conv2d(graph: Graph, is_stream: str):
     add_node_list = list()
+    # 先收集所有需要处理的卷积节点及其分叉信息
+    conv_nodes_with_branch = []  # [(node, conv_branches, pad相同标志)]
     for node in graph.nodes.values():
         pads_flag = False
         if node.op_type == "Conv2dInt":
@@ -21,62 +63,98 @@ def split_conv2d(graph: Graph, is_stream: str):
             x_h     = calc_expr(str(data.shape[1]), graph.dynamic_args_max) if is_sympy(data.shape[1]) else data.shape[1]
             x_w     = calc_expr(str(data.shape[2]), graph.dynamic_args_max) if is_sympy(data.shape[2]) else data.shape[2]
 
-            if kernels != (1, 1):
-                pads_flag = True
+            if kernels[0] == 1 and (is_stream == "split_w"):
+                continue
+            if kernels[1] == 1 and (is_stream == "split_w"):
+                continue
             if ((pads[-1], pads[-3]) != (0, 0) and (is_stream == "split_w")):
                 pads_flag = True
             if ((pads[-2], pads[-4]) != (0, 0) and (is_stream == "split_h")):
                 pads_flag = True
 
             if pads_flag:
-                new_node    = GraphNode("iqPad", node.name + "_pads")
-                new_node.attrs['mode'] = 'constant'
-                new_entry   = node.inputs[0].clone()
-                new_entry.name += "_prepads"
-                new_entry.set_graph_normal()
-                graph.add_entry(new_entry)
-                new_node.inputs.append(node.inputs[0])
-                new_node.outputs.append(new_entry)
-                if node.inputs[0].src_node == None:
-                    break
-                dst_nodes = node.inputs[0].src_node.outputs[0].dst_nodes
-                for n in dst_nodes:
-                    n.inputs[0] = new_entry
+                # 分叉检测：如果输入被多个Conv2dInt使用，检查pad是否相同
+                input_entry = node.inputs[0]
+                conv_branches = []
+                same_pads = True
+                if input_entry.src_node is not None:
+                    src_output = input_entry.src_node.outputs[0]
+                    dst_nodes = src_output.dst_nodes
+                    conv_branches = [n for n in dst_nodes if n.op_type == "Conv2dInt"]
+                    if len(conv_branches) > 1:
+                        same_pads = check_same_pads(conv_branches, is_stream)
+                        # pad相同时，只在第一个分支处理
+                        if same_pads and conv_nodes_with_branch:
+                            # 检查是否已经添加过这个分支组
+                            prev_input = conv_nodes_with_branch[-1][0].inputs[0] if conv_nodes_with_branch else None
+                            if prev_input is input_entry:
+                                continue
+                conv_nodes_with_branch.append((node, conv_branches, same_pads))
 
-                pads_value = np.zeros((8,), dtype=np.int64, order = "C")
-                # 从w维度拆分
-                if is_stream == "split_w":
-                  pads_value[-1] = pads[-1]
-                  if len(pads) == 2:
-                      pads_value[-5] = pads[-1]
-                      pads[-1] = 0
-                  elif len(pads) == 4:
-                      pads_value[-5] = pads[-3]
-                      pads[-3] = 0
-                      pads[-1] = 0
-                elif is_stream == "split_h":
-                # # 从h维度拆分
-                  pads_value[-2] = pads[-2]
-                  if len(pads) == 2:
-                      pads_value[-6] = pads[-2]
-                      pads[-2] = 0
-                  elif len(pads) == 4:
-                      pads_value[-6] = pads[-4]
-                      pads[-2] = 0
-                      pads[-4] = 0
-                for n in dst_nodes:
-                    n.attrs['pads'] = tuple(pads)
-                slice_start = Tensor.from_numpy(pads_value)
-                pads_entry = ConstantEntry(new_node.name+'_pads', slice_start)
-                graph.add_entry(pads_entry)
-                new_node.inputs.append(pads_entry)
+    # 统一创建iqPad节点
+    for node, conv_branches, same_pads in conv_nodes_with_branch:
+        pads = list(node.attrs['pads'])
+        new_node    = GraphNode("iqPad", node.name + "_pads")
+        new_node.attrs['mode'] = 'constant'
+        new_node.attrs['platform'] = node.attrs['platform']
+        new_entry   = node.inputs[0].clone()
+        new_entry.name += "_prepads"
+        new_entry.set_graph_normal()
+        graph.add_entry(new_entry)
+        new_node.inputs.append(node.inputs[0])
+        new_node.outputs.append(new_entry)
+        if node.inputs[0].src_node == None:
+            continue
+        dst_nodes = node.inputs[0].src_node.outputs[0].dst_nodes
 
-                data_value = np.zeros((1,), dtype=np.int64, order = "C")
-                data_tensor = Tensor.from_numpy(data_value)
-                data_entry = ConstantEntry(new_node.name+'_data', data_tensor)
-                graph.add_entry(data_entry)
-                new_node.inputs.append(data_entry)
-                add_node_list.append(new_node)
+        if same_pads and len(conv_branches) > 1:
+            # pad相同：在根节点统一提取，所有分支连接同一个iqPad
+            for n in dst_nodes:
+                n.inputs[0] = new_entry
+        else:
+            # 无分支或pad不一致：只连接当前节点
+            node.inputs[0] = new_entry
+
+        pads_value = np.zeros((8,), dtype=np.int64, order = "C")
+        # 从w维度拆分
+        if is_stream == "split_w":
+          pads_value[-1] = pads[-1]
+          if len(pads) == 2:
+              pads_value[-5] = pads[-1]
+              pads[-1] = 0
+          elif len(pads) == 4:
+              pads_value[-5] = pads[-3]
+              pads[-3] = 0
+              pads[-1] = 0
+        elif is_stream == "split_h":
+        # # 从h维度拆分
+          pads_value[-2] = pads[-2]
+          if len(pads) == 2:
+              pads_value[-6] = pads[-2]
+              pads[-2] = 0
+          elif len(pads) == 4:
+              pads_value[-6] = pads[-4]
+              pads[-2] = 0
+              pads[-4] = 0
+
+        # 根据连接方式更新对应节点的pads属性
+        if same_pads and len(conv_branches) > 1:
+            for n in dst_nodes:
+                n.attrs['pads'] = tuple(pads)
+        else:
+            node.attrs['pads'] = tuple(pads)
+
+        slice_start = Tensor.from_numpy(pads_value)
+        pads_entry = ConstantEntry(new_node.name+'_pads', slice_start)
+        graph.add_entry(pads_entry)
+        new_node.inputs.append(pads_entry)
+
+        data_value = np.zeros((1,), dtype=np.int64, order = "C")
+        data_tensor = Tensor.from_numpy(data_value)
+        data_entry = ConstantEntry(new_node.name+'_data', data_tensor)
+        graph.add_entry(data_entry)
+        new_node.inputs.append(data_entry)
+        add_node_list.append(new_node)
 
     for node in add_node_list:
         graph.add_node(node)
@@ -123,7 +201,7 @@ def stream_convert(graph: Graph, is_stream: str, is_dump: bool = False) -> Graph
           if pads_value[pads_len - i - 1]:
             data_shape_list[len(data_shape_list) - i - 1] = pads_value[pads_len - i - 1]
             pad_axis.append(len(data_shape_list) - i - 1)
-        assert len(pad_axis) == 1, "invalid parameter for iqPad"
+        # assert len(pad_axis) == 1, "invalid parameter for iqPad"
 
         new_entry1 = node.inputs[0].clone()
         new_entry1.name = new_entry1.name + '_transpose'

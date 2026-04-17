@@ -55,6 +55,9 @@ class Transpose(Operator):
         elif X.layout == Layout.NCWH and tuple(axes) == (0, 1, 3, 2):
             Y.layout = Layout.NCHW
 
+        if X.has_data():
+            Y.data = X.data.transpose(axes)
+
         self.outputs = [Y]
 
     def get_workspace(self) -> List[Tensor]:
