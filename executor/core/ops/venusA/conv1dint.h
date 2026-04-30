@@ -45,10 +45,10 @@ static void conv1dint_para_init(Conv1dIntAttrs *attrs, conv_struct_t *conv_attrs
     conv_attrs->weight_w = attrs->kernel;
     conv_attrs->stride_h = 1;
     conv_attrs->stride_w = attrs->stride;
-    conv_attrs->padding_h_up = attrs->pad[0];
-    conv_attrs->padding_h_down = attrs->pad[1];
-    conv_attrs->padding_w_left = 0;
-    conv_attrs->padding_w_right = 0;
+    conv_attrs->padding_h_up = 0;
+    conv_attrs->padding_h_down = 0;
+    conv_attrs->padding_w_left = attrs->pad[0];
+    conv_attrs->padding_w_right = attrs->pad[1];
     
     // Set activation type
     switch (attrs->act_type) {
@@ -117,7 +117,7 @@ int32_t conv1dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y, tTenso
     // Dimension parameters
     uint32_t input_c = conv_attrs.input_c;
     uint32_t output_c = conv_attrs.output_c;
-    int32_t group = conv_attrs.group;
+    int32_t group = attrs->group;
     int32_t kernel = attrs->kernel;
     
     // Check kernel size

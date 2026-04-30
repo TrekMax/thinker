@@ -152,7 +152,6 @@ static int32_t gru_luna_inner(gru_param_t *params, int32_t t, int8_t *p_input,
  * @param h2h_w Pointer to hidden-to-hidden weights tensor
  * @param i2h_bias Pointer to input bias tensor
  * @param h2h_bias Pointer to hidden bias tensor
- * @param mask Pointer to mask tensor (unused)
  * @param output Pointer to output tensor
  * @param hidden_o Pointer to current hidden state tensor
  * @param params Pointer to GRU attributes
@@ -161,7 +160,7 @@ static int32_t gru_luna_inner(gru_param_t *params, int32_t t, int8_t *p_input,
  */
 int32_t gruint_luna(tTensor *input, tTensor *history_h, tTensor *i2h_w,
                    tTensor *h2h_w, tTensor *i2h_bias, tTensor *h2h_bias,
-                   tTensor *mask, tTensor *output, tTensor *hidden_o,
+                   tTensor *output, tTensor *hidden_o,
                    GRUIntAttrs *params, tTensor *workspace) {
     if (input->dtype_ != Int8) {
         return T_ERR_INVALID_DATATYPE;

@@ -22,12 +22,10 @@
  */
 int32_t iqsigmoid(tTensor *X, tTensor *Y, tTensor *Temp) {
     uint32_t input_size = getTensorSize(X);
-    uint32_t workspace_size = getTensorSize(Temp);
+    uint32_t workspace_size = Temp ? Temp->shape_.dims_[0] : 0;
 
 #ifdef RUNTIME_PARAM_CHECK
-    /*Check the storage locations for input and output, 
-    as it is unnecessary because they have already been limited in tpacker.*/
-    if ((Y->mem_.type_ != 2)|| (Y->dtype_ != Int8)) 
+    if (Y->dtype_ != Int8)
         return T_ERR_INVALID_DATATYPE;
 #endif
     // Quantization parameters
@@ -36,50 +34,101 @@ int32_t iqsigmoid(tTensor *X, tTensor *Y, tTensor *Temp) {
     int32_t x_q = (int32_t)X->scale_;
     int32_t y_q = (int32_t)Y->scale_;
 
-    // Pointers to tensor data
-    int8_t *dst = (int8_t *)Y->dptr_;
+        // Determine memory types
+    bool y_in_psram = (Y->mem_.type_ != 2);
+    bool x_in_psram = (X->mem_.type_ != 2);
 
     // Quantization shift
     int32_t shift = Q_INPUT - x_q;
 
     // Perform quantized sigmoid computation
     if (X->dtype_ == Int8) {
-        // Check if temporary workspace is sufficient
-        if (workspace_size < input_size * 6) {
-            return T_ERR_NO_WORKSPACE;
+        uint32_t past_size = 0;
+        uint32_t chunk_size = workspace_size / 6;  // Max chunk size
+        while ((ALIGN4(chunk_size*2) + chunk_size*4) > workspace_size)
+            chunk_size -= 1;
+        while (past_size < input_size) {
+            uint32_t remain_size = input_size - past_size;
+            uint32_t cur_size = chunk_size < remain_size ? chunk_size : remain_size;
+
+            int8_t *src_chunk = (int8_t *)X->dptr_ + past_size;
+            int16_t *src_chunk_int16 = (int16_t *)Temp->dptr_;
+            int32_t *src_chunk_int32 = (int32_t *)((int8_t *)Temp->dptr_ + ALIGN4(cur_size * 2));
+            int8_t *dst_temp = y_in_psram ? (int8_t *)Temp->dptr_ : (int8_t *)Y->dptr_ + past_size;
+
+            THINKER_RET_CHECK(API_LIB(scale_i8i8o16)(src_chunk, 1, src_chunk_int16, cur_size, 0), "luna_scale_i8i8o16");
+            THINKER_RET_CHECK(API_LIB(scale_i16i16o32)(src_chunk_int16, 1, src_chunk_int32, cur_size, 0), "luna_scale_i16i16o32");
+            if (shift != 0) {
+                uint32_t shift1 = shift > 0 ? (uint32_t)shift : 0U;
+                uint32_t shift2 = shift > 0 ? 0U : (uint32_t)(-shift);
+                THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(src_chunk_int32, 1UL << shift1, src_chunk_int32, cur_size, shift2), "luna_scale_i32i32o32");
+            }
+            THINKER_RET_CHECK(API_LIB(sigmoid_i32o8)(src_chunk_int32, dst_temp, cur_size), "luna_sigmoid_i32o8");
+            if (y_in_psram)
+                opi_psram_cpy_out((void *)(Y->dptr_ + past_size), dst_temp, cur_size * sizeof(int8_t));
+            past_size += cur_size;
         }
-        int8_t *src = (int8_t *)X->dptr_;
-        int16_t *tmp = (int16_t *)Temp->dptr_;
-        int32_t *tmp1 = (int32_t *)(tmp + input_size);
-        THINKER_RET_CHECK(API_LIB(scale_i8i8o16)(src, 1, tmp, input_size, 0), "luna_scale_i8i8o16");  // Convert Int8 to Int16, venusA not support Int8 => Int32
-        THINKER_RET_CHECK(API_LIB(scale_i16i16o32)(tmp, 1UL << shift, tmp1, input_size, 0), "luna_scale_i16i16o32");  // Scale to Int32
-        THINKER_RET_CHECK(API_LIB(sigmoid_i32o8)(tmp1, dst, input_size), "luna_sigmoid_i32o8");  // Apply sigmoid activation and convert to Int8
     }
     else if (X->dtype_ == Int16) {
-        // Check if temporary workspace is sufficient
-        if (workspace_size < input_size * 4) {
-            return T_ERR_NO_WORKSPACE;
+        uint32_t past_size = 0;
+        uint32_t chunk_size = workspace_size / 4;  // Max chunk size
+        while (past_size < input_size) {
+            uint32_t remain_size = input_size - past_size;
+            uint32_t cur_size = chunk_size < remain_size ? chunk_size : remain_size;
+
+            int16_t *src_chunk = (int16_t *)X->dptr_ + past_size;
+            int32_t *src_chunk_int32 = (int32_t *)Temp->dptr_;
+            int8_t *dst_temp = y_in_psram ? (int8_t *)Temp->dptr_ : (int8_t *)Y->dptr_ + past_size;
+
+            THINKER_RET_CHECK(API_LIB(scale_i16i16o32)(src_chunk, 1, src_chunk_int32, cur_size, 0), "luna_scale_i16i16o32");
+            if (shift != 0) {
+                uint32_t shift1 = shift > 0 ? (uint32_t)shift : 0U;
+                uint32_t shift2 = shift > 0 ? 0U : (uint32_t)(-shift);
+                THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(src_chunk_int32, 1UL << shift1, src_chunk_int32, cur_size, shift2), "luna_scale_i32i32o32");
+            }
+            THINKER_RET_CHECK(API_LIB(sigmoid_i32o8)(src_chunk_int32, dst_temp, cur_size), "luna_sigmoid_i32o8");
+            if (y_in_psram)
+                opi_psram_cpy_out((void *)(Y->dptr_ + past_size), dst_temp, cur_size * sizeof(int8_t));
+            past_size += cur_size;
         }
-        int16_t *src = (int16_t *)X->dptr_;
-        int32_t *tmp = (int32_t *)Temp->dptr_;
-        THINKER_RET_CHECK(API_LIB(scale_i16i16o32)(src, 1 << shift, tmp, input_size, 0), "luna_scale_i16i16o32");  // Scale to Int32
-        THINKER_RET_CHECK(API_LIB(sigmoid_i32o8)(tmp, dst, input_size), "luna_sigmoid_i32o8");  // Apply sigmoid activation and convert to Int8
     }
     else if (X->dtype_ == Int32) {
-        int32_t *src = (int32_t *)X->dptr_;
-        if (shift != 0) {
-            // Check if temporary workspace is sufficient
-            if (workspace_size < input_size * 4) {
-                return T_ERR_NO_WORKSPACE;
-            }
-            int32_t *src = (int32_t *)X->dptr_;
-            int32_t *tmp = (int32_t *)Temp->dptr_;
-            uint32_t shift1 = shift > 0 ? shift : 0;
-            uint32_t shift2 = shift > 0 ? 0 : -shift;
-            THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(src, 1 << shift1, tmp, input_size, shift2), "luna_scale_i32i32o32");  // Scale to Int32
-            src = tmp;
+        if (!y_in_psram && shift == 0) {
+            THINKER_RET_CHECK(API_LIB(sigmoid_i32o8)((int32_t *)X->dptr_, (int8_t *)Y->dptr_, input_size), "luna_sigmoid_i32o8");
         }
-        THINKER_RET_CHECK(API_LIB(sigmoid_i32o8)(src, dst, input_size), "luna_sigmoid_i32o8");  // Apply sigmoid activation and convert to Int8
+        else if (shift == 0) {
+            uint32_t past_size = 0;
+            uint32_t chunk_size = workspace_size;  // Max chunk size
+            while (past_size < input_size) {
+                uint32_t remain_size = input_size - past_size;
+                uint32_t cur_size = chunk_size < remain_size ? chunk_size : remain_size;
+
+                int32_t *src_chunk = (int32_t *)X->dptr_ + past_size;
+                int8_t *dst_temp = (int8_t *)Temp->dptr_;
+                THINKER_RET_CHECK(API_LIB(sigmoid_i32o8)(src_chunk, dst_temp, cur_size), "luna_sigmoid_i32o8");
+                opi_psram_cpy_out((void *)(Y->dptr_ + past_size), dst_temp, cur_size * sizeof(int8_t));
+                past_size += cur_size;
+            }
+        }        
+        else {
+            uint32_t past_size = 0;
+            uint32_t chunk_size = workspace_size / 4;  // Max chunk size
+            while (past_size < input_size) {
+                uint32_t remain_size = input_size - past_size;
+                uint32_t cur_size = chunk_size < remain_size ? chunk_size : remain_size;
+
+                int32_t *src_chunk = (int32_t *)X->dptr_ + past_size;
+                int32_t *tmp_chunk = (int32_t *)Temp->dptr_;
+                int8_t *dst_temp = y_in_psram ? (int8_t *)Temp->dptr_ : (int8_t *)Y->dptr_ + past_size;
+                uint32_t shift1 = shift > 0 ? shift : 0;
+                uint32_t shift2 = shift > 0 ? 0 : -shift;
+                THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(src_chunk, 1UL << shift1, tmp_chunk, cur_size, shift2), "luna_scale_i32i32o32");
+                THINKER_RET_CHECK(API_LIB(sigmoid_i32o8)(tmp_chunk, dst_temp, cur_size), "luna_sigmoid_i32o8");
+                if (y_in_psram)
+                    opi_psram_cpy_out((void *)(Y->dptr_ + past_size), dst_temp, cur_size * sizeof(int8_t));
+                past_size += cur_size;
+            }
+        }
     }
     else
         return T_ERR_INVALID_DATATYPE;

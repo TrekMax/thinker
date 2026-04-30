@@ -1,7 +1,7 @@
 from .device_info import Device
 
 VENUSA_CONFIGS = {
-    "name": "ARCS",
+    "name": "VENUSA",
     "sram_size": 384 * 1024,  # 384 KB
     "psram_size": 8192 * 1024,  # 8 MB
     "dma_support": True,
@@ -18,7 +18,7 @@ VENUSA_CONFIGS = {
         "Split", "BatchNorm2dInt", "ReduceMean",
         "Requant", "LayerNormInt", "iqVar",
         "Cast", "Expand", "Tile", "topN", "topN2",
-        "Shape", "Packing", "GluInt"
+        "Shape", "Packing", "GluInt", "Gelu",  "Swish"
     ],
     "supported_precision": ["INT8", "INT16", "INT32"]
 }

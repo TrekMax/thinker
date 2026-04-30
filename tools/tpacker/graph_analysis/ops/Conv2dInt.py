@@ -18,11 +18,13 @@ class Conv2dIntAttrs(OperatorAttrs):
     def checkparams(self) -> None:
         """Check and validate the parameters for Conv2dInt operation."""
         platform = self.attrs.get("platform", "venus")
-        quant_type = (
-            RoundMethod.from_str(self.attrs.get("quant_mode"))
-            if platform in ["arcs", "venusA"]
-            else QuantType.from_str(self.attrs.get("platform_quant"))
-        )
+        if platform in {"arcs", "venusA"}:
+            quant_type = RoundMethod.from_str(self.attrs.get("quant_mode"))
+        else:
+            if "quant_mode" in self.attrs:
+                quant_type = QuantType.from_str(self.attrs.get("quant_mode"))
+            else:
+                quant_type = QuantType.from_str(self.attrs.get("platform_quant"))
         self.attrs["quant_type"] = quant_type
 
         # Check required attributes

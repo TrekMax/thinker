@@ -49,39 +49,43 @@ int32_t softmaxint_luna(tTensor *data, tTensor *out, tTensor *Workspace, Softmax
     }
 
     // Check if output is in PSRAM
-    if (out->mem_.type_ != 2) {
-        return T_ERR_INVALID_PLATFROM;
-    }
-
+    int32_t x_in_psram = (data->mem_.type_ != 2) ? 1 : 0;
+    int32_t y_in_psram = (out->mem_.type_ != 2) ? 1 : 0;
+    int32_t workspace_size = Workspace ? Workspace->shape_.dims_[0] : 0;
     int32_t x_scale = (int32_t)data->scale_;
     int32_t y_scale = (int32_t)out->scale_;
 
     // Process based on input data type
-    if (data->dtype_ == Int8) {
-        int16_t *p_tmp0 = (int16_t *)Workspace->dptr_;
-        int32_t *p_tmp1 = (int32_t *)(p_tmp0 + data_size);
-        int32_t *dst_tmp = p_tmp1 + 4 * data_size;
+    if ((data->dtype_ == Int8) && (out->dtype_ == Int8)) {
+        int32_t split_leading = 0;
+        int32_t paste_leading = 0;
+        while ((ALIGN4(split_leading * stride * 2) + split_leading * stride * 4) < workspace_size)
+            split_leading++;
+        while(paste_leading < leading) {
+            int32_t remain_leading = leading - paste_leading;
+            int32_t cur_leading = remain_leading > split_leading ? split_leading : remain_leading;
+            int32_t cur_size = cur_leading * stride;
+            int16_t *p_tmp0 = (int16_t *)Workspace->dptr_;
+            int32_t *p_tmp1 = (int32_t *)((int8_t *)Workspace->dptr_ + ALIGN4(cur_size * 2));
+            int32_t *dst_tmp = p_tmp1;
+            THINKER_RET_CHECK(API_LIB(scale_i8i8o16)((int8_t *)data->dptr_ + paste_leading * stride, 1, p_tmp0, cur_size, 0), "luna_scale_i8i8o16");
+            THINKER_RET_CHECK(API_LIB(scale_i16i16o32)(p_tmp0, 1, p_tmp1, cur_size, 0), "luna_scale_i16i16o32");
+            THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(p_tmp1, (1 << (SOFTMAX_Q_IN - x_scale)), p_tmp1, cur_size, 0), "luna_scale_i32i32o32");
 
-        // Scale from Int8 to Int16
-        THINKER_RET_CHECK(API_LIB(scale_i8i8o16)((int8_t *)data->dptr_, 1, p_tmp0, data_size, 0), "luna_scale_i8i8o16");
-        // Scale from Int16 to Int32
-        THINKER_RET_CHECK(API_LIB(scale_i16i16o32)(p_tmp0, 1, p_tmp1, data_size, 0), "luna_scale_i16i16o32");
-        // Apply input scaling
-        THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(p_tmp1, (1 << (SOFTMAX_Q_IN - x_scale)), p_tmp1, data_size, 0), "luna_scale_i32i32o32");
+            // Compute softmax
+            for (int32_t l = 0; l < cur_leading; ++l) {
+                int32_t offset = l * stride;
+                THINKER_RET_CHECK(API_LIB(softmax_i32o32)(p_tmp1 + offset, p_tmp1 + offset, stride), "luna_softmax_i32o32");
+            }
 
-        // Compute softmax
-        for (int32_t l = 0; l < leading; ++l) {
-            int32_t offset = l * stride;
-            THINKER_RET_CHECK(API_LIB(softmax_i32o32)(p_tmp1 + offset, (int32_t *)dst_tmp + offset, stride), "luna_softmax_i32o32");
-        }
-
-        // Scale output based on output data type
-        if (out->dtype_ == Int8) {
-            THINKER_RET_CHECK(API_LIB(scale_i32i32o8)((int32_t *)dst_tmp, 1, (int8_t *)out->dptr_, data_size, (SOFTMAX_Q_OUT - y_scale)), "luna_scale_i32i32o8");
-        } else if (out->dtype_ == Int16) {
-            THINKER_RET_CHECK(API_LIB(scale_i32i32o16)((int32_t *)dst_tmp, 1, (int16_t *)out->dptr_, data_size, (SOFTMAX_Q_OUT - y_scale)), "luna_sscale_i32i32o16");
-        } else {
-            THINKER_RET_CHECK(API_LIB(scale_i32i32o32)((int32_t *)dst_tmp, 1, (int32_t *)out->dptr_, data_size, (SOFTMAX_Q_OUT - y_scale)), "luna_scale_i32i32o32");
+            if (y_in_psram) {
+                THINKER_RET_CHECK(API_LIB(scale_i32i32o8)((int32_t *)dst_tmp, 1, (int8_t *)dst_tmp, cur_size, (SOFTMAX_Q_OUT - y_scale)), "luna_scale_i32i32o8");
+                opi_psram_cpy_out(dst_tmp, (int8_t *)out->dptr_ + paste_leading * stride, cur_size);
+            } 
+            else {
+                THINKER_RET_CHECK(API_LIB(scale_i32i32o8)((int32_t *)dst_tmp, 1, (int8_t *)out->dptr_ + paste_leading * stride, cur_size, (SOFTMAX_Q_OUT - y_scale)), "luna_scale_i32i32o32");
+            }
+            paste_leading += cur_leading;
         }
     } else if (data->dtype_ == Int16) {
         int32_t *p_tmp = (int32_t *)Workspace->dptr_;

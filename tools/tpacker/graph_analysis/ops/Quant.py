@@ -3,7 +3,7 @@ import numpy as np
 
 from ...xsympy import is_sympy
 from ...resource_packer._type._ctype import tffi
-from .utils import QuantType, calc_expr
+from .utils import QuantType, calc_expr, RoundMethod
 from .base import Operator, OperatorAttrs, register_op
 
 
@@ -12,13 +12,21 @@ class QuantAttrs(OperatorAttrs):
         """Check required parameters"""
         assert "scale_x" in self.attrs and "data_bits" in self.attrs
         assert self.attrs['data_bits'] in (8, 16, 32), "Data bits must be 8, 16 or 32"
+        platform = self.attrs.get("platform", "venus")
+        if platform in {"arcs", "venusA"}:
+            quant_type = QuantType.from_str(self.attrs.get("platform_quant", "qmax_quant"))
+        else:
+            if "quant_mode" in self.attrs:
+                quant_type = QuantType.from_str(self.attrs.get("quant_mode"))
+            else:
+                quant_type = QuantType.from_str(self.attrs.get("platform_quant"))
+        self.attrs["quant_mode"] = quant_type
 
     def serialize(self) -> bytes:
         """Serialize attributes to bytes"""
         attrs = tffi.new("QuantAttrs *")
         attrs.data_bits = self.attrs["data_bits"]
-        quant_type = QuantType.from_str(self.attrs.get("platform_quant", "qmax_quant"))
-        attrs.quant_type = quant_type.value
+        attrs.quant_type = self.attrs["quant_mode"].value
         return bytes(tffi.buffer(attrs))
 
 

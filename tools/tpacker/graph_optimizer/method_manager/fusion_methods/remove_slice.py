@@ -45,7 +45,9 @@ def remove_slice(graph: Graph) -> Graph:
                         # 替换后续节点输入
                         for next_node in output_entry.dst_nodes:
                             if next_node.inputs:
-                                next_node.inputs[0] = node.inputs[0]
+                                for i, input_tensor in enumerate(next_node.inputs):
+                                    if input_tensor == output_entry:
+                                        next_node.inputs[i] = node.inputs[0]
                         
                         # 删除条目
                         if output_entry.name in graph.entries:

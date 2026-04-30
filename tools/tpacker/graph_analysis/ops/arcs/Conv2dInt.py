@@ -125,6 +125,7 @@ def Conv2dInt_weight_rearrange(
             if kernel_size * weight.dtype.itemsize > 8192:
                 temp_size = num_input_align * kernel_h * kernel_w
                 max_size = 8192 // temp_size
+                assert max_size > 0, "kernel size of Conv2dInt must be less than 8KB"
                 if max_size % 2 != 0:
                     max_size -= 1
                 split_num = (kernel_num + max_size - 1) // max_size

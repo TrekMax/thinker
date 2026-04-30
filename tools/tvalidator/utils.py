@@ -121,8 +121,7 @@ class ONNXModel:
             _, attrs = parse_attribute_and_name(node)
             if "platform" in attrs:
                 return attrs['platform']
-            else:
-                return "venus"
+        return "venus"
 
     def generate_input(self):
         def resolve_input_index(node, locator_logic: dict):

@@ -56,7 +56,7 @@ int32_t iqmul_luna(tTensor *lhs, tTensor *rhs, tTensor *Y, tTensor *Temp, iqBina
         return T_ERR_INVALID_PARA;
     }
 
-    if ((lhs->dtype_ == rhs->dtype_) && (lhs->dtype_ == Y->dtype_))
+    if ((lhs->dtype_ != rhs->dtype_) || (lhs->dtype_ != Y->dtype_))
         return T_ERR_INVALID_DATATYPE;
 
     if (lhs->shape_.ndim_ == 4 && rhs->shape_.ndim_ == 4 &&

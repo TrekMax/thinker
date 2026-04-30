@@ -70,9 +70,9 @@ static void luna_meanpool_para_init(PoolAttrs* attrs, conv_struct_t *conv_attrs,
     int32_t q_y = (int32_t)Y->scale_;
     conv_attrs->activation_type = NO_ACTIVE;
     conv_attrs->positive_shift_type = ShiftType_FloorX05;
-    conv_attrs->positive_shift_value = q_x - q_y;
+    conv_attrs->positive_shift_value = 0;
     conv_attrs->negative_shift_type = ShiftType_FloorX05;
-    conv_attrs->negative_shift_value = conv_attrs->positive_shift_value;
+    conv_attrs->negative_shift_value = 0;
 
     uint8_t data_mem_type = (X->mem_.type_ & 0x0F) + 1;
     data_mem_type = (data_mem_type == 3) ? 0 : data_mem_type;
@@ -134,6 +134,8 @@ int32_t avgpool2dint_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs
         if ((one_kernel_size & (one_kernel_size - 1)) == 0) { // kernel_size is power of 2
             int32_t *p_tmp = (int32_t *)Temp->dptr_;
             shift = my_log2((float)one_kernel_size) + X->scale_ - Y->scale_;
+            uint32_t shift1 = shift < 0 ? 1UL << -shift : 1;
+            uint32_t shift2 = shift < 0 ? 0 : shift;
             if ((input_h_after_padding == k_h) && (input_w_after_padding == k_w)) { // kernel_size == input_size
                 int8_t *p0 = (int8_t *)Temp->dptr_;
                 int32_t *p1 = (int32_t *)(p0 + in_h * in_w);
@@ -144,15 +146,15 @@ int32_t avgpool2dint_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs
 
                 if (Y->dtype_ == Int8) {
                     int8_t *p_out = (int8_t *)Y->dptr_;
-                    THINKER_RET_CHECK(API_LIB(scale_i32i32o8)((int32_t *)p1, 1, p_out, in_c * ou_channel_size, shift), "luna_scale_i32i32o8");
+                    THINKER_RET_CHECK(API_LIB(scale_i32i32o8)((int32_t *)p1, shift1, p_out, in_c * ou_channel_size, shift2), "luna_scale_i32i32o8");
                 } 
                 else if (Y->dtype_ == Int16) {
                     int16_t *p_out = (int16_t *)Y->dptr_;
-                    THINKER_RET_CHECK(API_LIB(scale_i32i32o16)((int32_t *)p1, 1, p_out, in_c * ou_channel_size, shift), "luna_scale_i32i32o16");
+                    THINKER_RET_CHECK(API_LIB(scale_i32i32o16)((int32_t *)p1, shift1, p_out, in_c * ou_channel_size, shift2), "luna_scale_i32i32o16");
                 } 
                 else {
                     int32_t *p_out = (int32_t *)Y->dptr_;
-                    THINKER_RET_CHECK(API_LIB(scale_i32i32o32)((int32_t *)p1, 1, p_out, in_c * ou_channel_size, shift), "luna_scale_i32i32o32");
+                    THINKER_RET_CHECK(API_LIB(scale_i32i32o32)((int32_t *)p1, shift1, p_out, in_c * ou_channel_size, shift2), "luna_scale_i32i32o32");
                 }
             } 
             else {
@@ -166,7 +168,7 @@ int32_t avgpool2dint_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs
                     pool_struct_.input_c = in_c_split;
                     THINKER_RET_CHECK(luna_split_conv_para_pack(&pool_struct_, &pool_static_para, LUNA_MEAN_POOLING), "luna_split_conv_para_pack");
                     THINKER_RET_CHECK(API_LIB(mean_pooling2d_i8o32)(p_in, (int32_t *)p_tmp, &pool_static_para), "luna_mean_pooling2d_i8o32");
-                    THINKER_RET_CHECK(API_LIB(scale_i32i32o8)(p_tmp, 1, p_out, in_c_split * ou_channel_size, shift), "luna_scale_i32i32o8");
+                    THINKER_RET_CHECK(API_LIB(scale_i32i32o8)(p_tmp, shift1, p_out, in_c_split * ou_channel_size, shift2), "luna_scale_i32i32o8");
                 }
 
                 if (0 != s_num) {
@@ -175,14 +177,16 @@ int32_t avgpool2dint_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs
                     pool_struct_.input_c = s_num;
                     THINKER_RET_CHECK(luna_split_conv_para_pack(&pool_struct_, &pool_static_para, LUNA_MEAN_POOLING), "luna_split_conv_para_pack");
                     THINKER_RET_CHECK(API_LIB(mean_pooling2d_i8o32)(p_in, (int32_t *)p_tmp, &pool_static_para), "luna_mean_pooling2d_i8o32");
-                    THINKER_RET_CHECK(API_LIB(scale_i32i32o8)(p_tmp, 1, p_out, s_num * ou_channel_size, shift), "luna_scale_i32i32o8");
+                    THINKER_RET_CHECK(API_LIB(scale_i32i32o8)(p_tmp, shift1, p_out, s_num * ou_channel_size, shift2), "luna_scale_i32i32o8");
                 }
             }
         } 
         else {
             int32_t q_x = (int32_t)X->scale_;
             int32_t q_o = (int32_t)Y->scale_;
-
+            int32_t shift = q_x - q_o;
+            uint32_t shift1 = shift < 0 ? 1UL << -shift : 1;
+            uint32_t shift2 = shift < 0 ? 0 : shift;
             if ((input_h_after_padding == k_h) && (input_w_after_padding == k_w)) {
                 int32_t *p_tmp1 = (int32_t *)Temp->dptr_;
                 int32_t *p_tmp2 = (int32_t *)(p_tmp1 + in_c * ou_channel_size);
@@ -191,19 +195,19 @@ int32_t avgpool2dint_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs
                 THINKER_RET_CHECK(API_LIB(memset_i8o8)((int8_t *)p_tmp1, 1, in_h * in_w), "luna_memset_i8o8");
                 THINKER_RET_CHECK(API_LIB(split_mat_mul_i8i8o32)(p_in, (int8_t *)p_tmp1, (int32_t *)p_tmp2, in_c, in_h * in_w, 1, 0), "luna_split_mat_mul_i8i8o32");
                 THINKER_RET_CHECK(API_LIB(memset_i32o32)(p_tmp1, one_kernel_size, in_c * ou_channel_size), "luna_memset_i32o32");
-                THINKER_RET_CHECK(API_LIB(div_i32i32o32)(p_tmp2, p_tmp1, p_tmp1, in_c * ou_channel_size, q_o - q_x), "luna_div_i32i32o32");
+                THINKER_RET_CHECK(API_LIB(div_i32i32o32)(p_tmp2, p_tmp1, p_tmp1, in_c * ou_channel_size, 0), "luna_div_i32i32o32");
 
                 if (Y->dtype_ == Int8) {
                     int8_t *p_out = (int8_t *)Y->dptr_;
-                    THINKER_RET_CHECK(API_LIB(scale_i32i32o8)(p_tmp1, 1, p_out, in_c * ou_channel_size, 0), "luna_scale_i32i32o8");
+                    THINKER_RET_CHECK(API_LIB(scale_i32i32o8)(p_tmp1, shift1, p_out, in_c * ou_channel_size, shift2), "luna_scale_i32i32o8");
                 }
                 else if (Y->dtype_ == Int16) {
                     int16_t *p_out = (int16_t *)Y->dptr_;
-                    THINKER_RET_CHECK(API_LIB(scale_i32i32o16)(p_tmp1, 1, p_out, in_c * ou_channel_size, 0), "luna_scale_i32i32o16");
+                    THINKER_RET_CHECK(API_LIB(scale_i32i32o16)(p_tmp1, shift1, p_out, in_c * ou_channel_size, shift2), "luna_scale_i32i32o16");
                 }
                 else {
                     int32_t *p_out = (int32_t *)Y->dptr_;
-                    THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(p_tmp1, 1, p_out, in_c * ou_channel_size, 0), "luna_scale_i32i32o32");
+                    THINKER_RET_CHECK(API_LIB(scale_i32i32o32)(p_tmp1, shift1, p_out, in_c * ou_channel_size, shift2), "luna_scale_i32i32o32");
                 }
             } 
             else {
@@ -221,8 +225,8 @@ int32_t avgpool2dint_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs
                     THINKER_RET_CHECK(luna_split_conv_para_pack(&pool_struct_, &pool_static_para, LUNA_MEAN_POOLING), "luna_split_conv_para_pack");
                     THINKER_RET_CHECK(API_LIB(mean_pooling2d_i8o32)(p_in, (int32_t *)p_tmp2, &pool_static_para), "luna_mean_pooling2d_i8o32");
                     THINKER_RET_CHECK(API_LIB(memset_i32o32)(p_tmp1, one_kernel_size, in_c_split * ou_channel_size), "luna_memset_i32o32");
-                    THINKER_RET_CHECK(API_LIB(div_i32i32o32)(p_tmp2, p_tmp1, p_tmp1, in_c_split * ou_channel_size, q_o - q_x), "luna_div_i32i32o32");
-                    THINKER_RET_CHECK(API_LIB(scale_i32i32o8)(p_tmp1, 1, p_out, in_c_split * ou_channel_size, 0), "luna_scale_i32i32o8");
+                    THINKER_RET_CHECK(API_LIB(div_i32i32o32)(p_tmp2, p_tmp1, p_tmp1, in_c_split * ou_channel_size, 0), "luna_div_i32i32o32");
+                    THINKER_RET_CHECK(API_LIB(scale_i32i32o8)(p_tmp1, shift1, p_out, in_c_split * ou_channel_size, shift2), "luna_scale_i32i32o8");
                 }
 
                 if (0 != s_num) {
@@ -232,8 +236,8 @@ int32_t avgpool2dint_luna(const tTensor* X, tTensor* Y, tTensor* Temp, PoolAttrs
                     THINKER_RET_CHECK(luna_split_conv_para_pack(&pool_struct_, &pool_static_para, LUNA_MEAN_POOLING), "luna_split_conv_para_pack");
                     THINKER_RET_CHECK(API_LIB(mean_pooling2d_i8o32)(p_in, (int32_t *)p_tmp2, &pool_static_para), "luna_mean_pooling2d_i8o32");
                     THINKER_RET_CHECK(API_LIB(memset_i32o32)(p_tmp1, one_kernel_size, s_num * ou_channel_size), "luna_memset_i32o32");
-                    THINKER_RET_CHECK(API_LIB(div_i32i32o32)(p_tmp2, p_tmp1, p_tmp1, s_num * ou_channel_size, q_o - q_x), "luna_div_i32i32o32");
-                    THINKER_RET_CHECK(API_LIB(scale_i32i32o8)(p_tmp1, 1, p_out, s_num * ou_channel_size, 0), "luna_scale_i32i32o8");
+                    THINKER_RET_CHECK(API_LIB(div_i32i32o32)(p_tmp2, p_tmp1, p_tmp1, s_num * ou_channel_size, 0), "luna_div_i32i32o32");
+                    THINKER_RET_CHECK(API_LIB(scale_i32i32o8)(p_tmp1, shift1, p_out, s_num * ou_channel_size, shift2), "luna_scale_i32i32o8");
                 }
             }
         }

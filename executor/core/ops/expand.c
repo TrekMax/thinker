@@ -12,6 +12,7 @@
 #endif
 
 #ifdef THINKER_USE_VENUSA
+#include "./venusA/luna/luna_matrix_math.h"
 #include "./venusA/luna/luna_misc_math.h"
 #endif
 
@@ -26,8 +27,8 @@
  */
 int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_List *list) {
     // Validate tensor count
-    CHECK_EQ(num_tensor, (op->num_input_ + op->num_output_));
-    if (num_tensor != 3) 
+    CHECK_GE(num_tensor, (op->num_input_ + op->num_output_));
+    if (num_tensor < 3) 
         return T_ERR_INVALID_PARA;
 
     // Get input and output tensors
@@ -89,6 +90,21 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
         }
     });
 #elif THINKER_USE_ARCS || THINKER_USE_VENUSA
+    // if(xdim == ydim && tShape[xdim - 1] == 1 && tShape[xdim -1] != yshape[xdim -1] && X->dtype_ == Int8)
+    // {
+    //     int32_t expand_dim = xdim -1;
+    //     uint32_t expand_num = yshape[expand_dim] / tShape[expand_dim];
+    //     uint32_t data_size = getTensorSize(X);
+    //     int8_t *tmp = (int8_t *)Y->dptr_;
+    //     int8_t *psrc = (int8_t *)X->dptr_;
+    //     int8_t *pdst = (int8_t *)Y->dptr_;
+    //     //[F,1] * [1,B]=>[F,B]
+    //     if (ALIGN4(data_size) * 8 > 65536)
+    //         return T_ERR_FAIL;
+    //     THINKER_RET_CHECK(luna_memset_i8o8(tmp, 1, expand_num), "luna_memset_i8o8");
+    //     THINKER_RET_CHECK(luna_mat_mul_i8i8o8(psrc, tmp, pdst, data_size, 1, expand_num, 0), "luna_mat_mul_i8i8o8");
+    //     return T_SUCCESS;
+    // }
     DATA_TYPE_SWITCH_ALL(X->dtype_, Type, {
         const Type *input = (Type *)X->dptr_;
         Type *output = (Type *)Y->dptr_;

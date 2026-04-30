@@ -183,6 +183,7 @@ def stream_convert(graph: Graph, is_stream: str, is_dump: bool = False) -> Graph
     del_nodes_list = list()
     graph_inputs = list(graph.inputs)
     graph_outputs = list(graph.outputs)
+    num_otuput = len(graph_outputs)
     for node in graph.nodes.values():
       if node.op_type == 'iqPad':
         assert len(node.outputs[0].dst_nodes) == 1, "The number of outputs of the iqPad operator must equal 1"
@@ -201,7 +202,9 @@ def stream_convert(graph: Graph, is_stream: str, is_dump: bool = False) -> Graph
           if pads_value[pads_len - i - 1]:
             data_shape_list[len(data_shape_list) - i - 1] = pads_value[pads_len - i - 1]
             pad_axis.append(len(data_shape_list) - i - 1)
-        # assert len(pad_axis) == 1, "invalid parameter for iqPad"
+        # # assert len(pad_axis) == 1, "invalid parameter for iqPad"
+        # if len(pad_axis) != 1:
+        #   breakpoint()
 
         new_entry1 = node.inputs[0].clone()
         new_entry1.name = new_entry1.name + '_transpose'
@@ -371,7 +374,7 @@ def stream_convert(graph: Graph, is_stream: str, is_dump: bool = False) -> Graph
           new_node5.outputs = [new_entry12]
 
         new_entry12.set_graph_output()
-        graph_outputs.insert(-1, new_entry12)
+        graph_outputs.insert(-1*num_otuput, new_entry12)
 
         if len(node.outputs[0].dst_nodes) != 1:
           return
@@ -491,18 +494,40 @@ def stream_convert(graph: Graph, is_stream: str, is_dump: bool = False) -> Graph
           new_node4.outputs = [new_entry8]
           add_nodes_list.append(new_node4)
           new_entry7.set_graph_output()
-          graph_outputs.insert(-1, new_entry8)
+          graph_outputs.insert(-1*num_otuput, new_entry8)
 
         else:
           new_entry1.set_graph_output()
-          graph_outputs.insert(-1, new_entry1)
+          graph_outputs.insert(-1*num_otuput, new_entry1)
 
         new_pads = list(pads)
         new_pads[0] = kernels[0] - 1
         new_pads[2] = kernels[0] -strides[0] + output_padding[0]
         
         node.attrs['pads'] = tuple(new_pads)
-      
+      elif node.op_type == "GRUInt":
+        hidden_in = node.inputs[1]
+        assert hidden_in.data == None, "input of gru stream must have hidden state"
+        hidden_in.set_graph_input()
+        graph_inputs.append(hidden_in)
+        hidden_out = node.outputs[1]
+        hidden_out.set_graph_output()
+        graph_outputs.insert(-num_otuput, hidden_out)
+      elif node.op_type == "LstmInt":
+        hidden_in = node.inputs[1]
+        assert hidden_in.data == None, "input of lstm stream must have hidden state"
+        hidden_in.set_graph_input()
+        graph_inputs.append(hidden_in)
+        cell_in = node.inputs[2]
+        assert cell_in.data == None, "input of lstm stream must have cell state"
+        cell_in.set_graph_input()
+        graph_inputs.append(cell_in)
+        hidden_out = node.outputs[1]
+        hidden_out.set_graph_output()
+        graph_outputs.insert(-num_otuput, hidden_out)
+        cell_out = node.outputs[2]
+        cell_out.set_graph_output()
+        graph_outputs.insert(-num_otuput, cell_out)
     for node in add_nodes_list:
       graph.add_node(node)
 

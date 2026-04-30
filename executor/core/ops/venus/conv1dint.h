@@ -188,19 +188,19 @@ static void conv1dint_para_init(Conv1dIntAttrs *attrs,
     conv_attrs->is_bias = 1;
   }
   conv_attrs->input_c = X->shape_.dims_[1];
-  conv_attrs->input_h = X->shape_.dims_[2];
-  conv_attrs->input_w = 1;
+  conv_attrs->input_h = 1;
+  conv_attrs->input_w = X->shape_.dims_[2];
   conv_attrs->output_c = Y->shape_.dims_[1];
-  conv_attrs->output_h = Y->shape_.dims_[2];
-  conv_attrs->output_w = 1;
-  conv_attrs->weight_h = attrs->kernel;
-  conv_attrs->weight_w = 1;
-  conv_attrs->stride_h = attrs->stride;
-  conv_attrs->stride_w = 1;
-  conv_attrs->padding_h_up = attrs->pad[0];
-  conv_attrs->padding_h_down = attrs->pad[1];
-  conv_attrs->padding_w_left = 0;
-  conv_attrs->padding_w_right = 0;
+  conv_attrs->output_h = 1;
+  conv_attrs->output_w = Y->shape_.dims_[2];
+  conv_attrs->weight_h = 1;
+  conv_attrs->weight_w = attrs->kernel;
+  conv_attrs->stride_h = 1;
+  conv_attrs->stride_w = attrs->stride;
+  conv_attrs->padding_h_up = 0;
+  conv_attrs->padding_h_down = 0;
+  conv_attrs->padding_w_left = attrs->pad[0];
+  conv_attrs->padding_w_right = attrs->pad[1];
   conv_attrs->input_h_after_padding = conv_attrs->input_h +
                                       conv_attrs->padding_h_up +
                                       conv_attrs->padding_h_down;

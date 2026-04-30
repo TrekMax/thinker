@@ -17,6 +17,7 @@ class GRUIntAttrs(OperatorAttrs):
     def serialize(self) -> bytes:
         """Serialize the attributes into bytes for the GRUInt operation."""
         attrs = tffi.new("GRUIntAttrs *")
+        attrs.direction = self.attrs["go_forward"]
         attrs.hidden_size = self.attrs["hidden_size"]
         attrs.input_size = self.attrs["input_size"]
         attrs.layout = self.attrs.get("batch_first", 0)
@@ -33,7 +34,11 @@ class GRUInt(Operator):
         """Infer the output tensor shape and properties based on inputs."""
         inputs = self.inputs
         assert len(inputs) > 3, "GRUInt operator must have more than three inputs"
-
+        # inputs ==6; input,hx iw,hw,ib,hb
+        if len(inputs) == 6:
+            self.weight_index = 2
+        else:
+            self.weight_index = 1
         X = inputs[0]  # Input tensor
         i2h_w = inputs[self.weight_index]  # Input-to-hidden weights
         h2h_w = inputs[self.weight_index + 1]  # Hidden-to-hidden weights
@@ -93,18 +98,29 @@ class GRUInt(Operator):
         h2h_weight = self.inputs[self.weight_index + 1]
         hidden_size = h2h_weight.shape[1]
         platform = self.attrs.get("platform", "venus")
+        layout = self.attrs.get("batch_first", 0)
+        if layout == 1:
+            B,T,L = self.inputs[0].shape
+        else:
+            T,B,L = self.inputs[0].shape
         if platform == "venus":
             workspace_size = hidden_size * 4 * 3
         else:
-            workspace_size = hidden_size * 4 * 5
+            # Keep a guard band beyond the theoretical int32 scratch usage.
+            # The runtime kernels operate on tightly packed scratch buffers,
+            # and packing the workspace to the exact lower bound can corrupt
+            # the next share-memory slot for larger GRU cases.
+            workspace_size = hidden_size * B * 4 * 7
+            if layout == 1 and B != 1:
+               workspace_size += B * T * L 
         return [Tensor.from_shape([workspace_size], np.int8, MemType.SHARE_MEM)]
 
     def pack_params(self):
         """Pack the parameters for the GRUInt operation, handling weight transposition."""
         weight_i = self.inputs[self.weight_index]
         weight_h = self.inputs[self.weight_index + 1]
-        data_i = weight_i.data.transpose(1, 0)
-        data_h = weight_h.data.transpose(1, 0)
+        data_i = weight_i.data
+        data_h = weight_h.data
         self.inputs[self.weight_index].update(data=data_i, shape=data_i.shape)
         self.inputs[self.weight_index + 1].update(data=data_h, shape=data_h.shape)
 

@@ -51,3 +51,5 @@ from .topN2 import *
 from .LogSoftmax import *
 from .Pad import *
 from .Packing import *
+from .Gelu import *
+from .Swish import *

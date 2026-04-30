@@ -2,7 +2,7 @@ import math
 import numpy as np
 
 from ..utils import AutoPad, CeilMode, combine4bit_8bit
-from ....enum_defines import Layout, MemType, ALIGN2, ALIGN8
+from ....enum_defines import Layout, MemType, ALIGN4, ALIGN8
 
 
 def get_Conv1dInt_workspace(
@@ -100,7 +100,7 @@ def Conv1dInt_weight_rearrange(
         
         # Common convolution case
         else:
-            num_output_align = ALIGN2(kernel_num)
+            num_output_align = ALIGN4(kernel_num)
             num_input_align = ALIGN8(kernel_c)
 
             new_weight_data = np.zeros((num_output_align, num_input_align, kernel_w), weight.dtype)
@@ -109,7 +109,7 @@ def Conv1dInt_weight_rearrange(
                     new_weight_data[p, q, :] = weight.data[p, q, :]
 
             new_weight_data = new_weight_data.transpose(0, 2, 1)
-            new_weight_data = new_weight_data.reshape(-1, 2, kernel_w, num_input_align)
+            new_weight_data = new_weight_data.reshape(-1, 4, kernel_w, num_input_align)
             new_weight_data = new_weight_data.transpose(0, 2, 1, 3)
             shape = new_weight_data.shape
             new_weight_data = new_weight_data.reshape(shape[0], shape[1], shape[2], -1, 8)

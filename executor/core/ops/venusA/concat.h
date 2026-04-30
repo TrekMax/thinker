@@ -86,15 +86,14 @@ int32_t concat_luna(tTensor **tensors, int32_t axis, int32_t input_num, tTensor 
                     uint32_t shift1 = (input_scale < output_scale) ? (output_scale - input_scale) : 0;
                     uint32_t shift2 = (input_scale > output_scale) ? (input_scale - output_scale) : 0;
                     if (output->mem_.type_ == 2) {
-                        // just support (output_scale >= input_scale)
-                        THINKER_RET_CHECK(API_LIB(scale_i8i8o8)(src, 1UL << shift1, dst, hw_curr, shift2), "luna_scale_i8o8");
+                        THINKER_RET_CHECK(API_LIB(scale_i8i8o8)(src, 1UL << shift1, dst, hw_curr, shift2), "luna_scale_i8i8o8");
                     } 
                     else {
                         int32_t past_size = 0;
                         while (past_size < hw_curr) {
                             int32_t remain_size = hw_curr - past_size;
                             int32_t cur_size = (workspace_size < remain_size) ? workspace_size : remain_size;
-                            THINKER_RET_CHECK(API_LIB(scale_i8i8o8)(src + past_size, 1UL << shift1, dst_ptr, cur_size, shift2), "luna_scale_i8o8");
+                            THINKER_RET_CHECK(API_LIB(scale_i8i8o8)(src + past_size, 1UL << shift1, dst_ptr, cur_size, shift2), "luna_scale_i8i8o8");
 
                             opi_psram_cpy_out(dst + past_size, dst_ptr, cur_size);
                             past_size += cur_size;
@@ -143,17 +142,23 @@ int32_t concat_luna(tTensor **tensors, int32_t axis, int32_t input_num, tTensor 
                     }
                 } 
                 else {
+                    uint32_t shift1 = (input_scale < output_scale) ? (output_scale - input_scale) : 0;
+                    uint32_t shift2 = (input_scale > output_scale) ? (input_scale - output_scale) : 0;
                     if (output->mem_.type_ == 2) {
-                        // just support output_scale >= input_scale
                         for (int32_t l = 0; l < leading; ++l) {
-                            THINKER_RET_CHECK(API_LIB(scale_i8i8o8)(src + l * hw_curr, 1UL << (output_scale - input_scale), dst + l * hw, hw_curr, 0), "luna_scale_i8i8o8");
+                            THINKER_RET_CHECK(
+                                API_LIB(scale_i8i8o8)(src + l * hw_curr, 1UL << shift1, dst + l * hw, hw_curr, shift2),
+                                "luna_scale_i8i8o8"
+                            );
                         }
                     } 
                     else {
-                        // just support output_scale >= input_scale
                         if (workspace_size < hw_curr) return T_ERR_NO_WORKSPACE;
                         for (int32_t l = 0; l < leading; ++l) {
-                            THINKER_RET_CHECK(API_LIB(scale_i8i8o8)(src + l * hw_curr, 1UL << (output_scale - input_scale), dst_ptr, hw_curr, 0), "luna_scale_i8i8o8");
+                            THINKER_RET_CHECK(
+                                API_LIB(scale_i8i8o8)(src + l * hw_curr, 1UL << shift1, dst_ptr, hw_curr, shift2),
+                                "luna_scale_i8i8o8"
+                            );
                             opi_psram_cpy_out(dst + l * hw, dst_ptr, hw_curr);
                         }
                     }

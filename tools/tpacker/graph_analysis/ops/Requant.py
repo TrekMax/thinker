@@ -16,11 +16,13 @@ class RequantAttrs(OperatorAttrs):
         assert self.attrs['data_bits'] in (8, 16, 32), "Data bits must be 8, 16, or 32"
         assert self.attrs['o_bits'] in (8, 16, 32), "Output bits must be 8, 16, or 32"
         platform = self.attrs.get("platform", "venus")
-        quant_type = (
-            RoundMethod.from_str(self.attrs.get("quant_mode"))
-            if platform in ["arcs", "venusA"]
-            else QuantType.from_str(self.attrs.get("platform_quant", "LUNA_QUANT"))
-        )
+        if platform in {"arcs", "venusA"}:
+            quant_type = RoundMethod.from_str(self.attrs.get("quant_mode"))
+        else:
+            if "quant_mode" in self.attrs:
+                quant_type = QuantType.from_str(self.attrs.get("quant_mode"))
+            else:
+                quant_type = QuantType.from_str(self.attrs.get("platform_quant", "LUNA_QUANT"))
         self.attrs["quant_type"] = quant_type
     def serialize(self) -> bytes:
         """Serialize Requant attributes to bytes"""

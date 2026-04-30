@@ -118,11 +118,14 @@ class iqUnaryOperatorAttrs(OperatorAttrs):
         """Normalize operator attributes."""
         platform = self.attrs.get("platform", "venus")
         if platform in {"arcs", "venusA"}:
-            quant_type = self.attrs.get("quant_mode", "floor_add")
-            self.attrs["quant_mode"] = RoundMethod.from_str(quant_type)
-        elif platform == "venus":
-            quant_type = QuantType.from_str(self.attrs.get("platform_quant"))
-            self.attrs["quant_mode"] = quant_type
+            quant_type = RoundMethod.from_str(self.attrs.get("quant_mode"))
+        else:
+            if "quant_mode" in self.attrs:
+                quant_type = QuantType.from_str(self.attrs.get("quant_mode"))
+            else:
+                quant_type = QuantType.from_str(self.attrs.get("platform_quant"))
+                
+        self.attrs["quant_mode"] = quant_type
 
 
 class iqBinaryOperatorAttrs(OperatorAttrs):
@@ -134,11 +137,13 @@ class iqBinaryOperatorAttrs(OperatorAttrs):
         """Normalize operator attributes."""
         platform = self.attrs.get("platform", "venus")
         if platform in {"arcs", "venusA"}:
-            quant_type = self.attrs.get("quant_mode", "floor_add")
-            self.attrs["quant_mode"] = RoundMethod.from_str(quant_type)
-        elif platform == "venus":
-            quant_type = QuantType.from_str(self.attrs.get("platform_quant"))
-            self.attrs["quant_mode"] = quant_type
+            quant_type = RoundMethod.from_str(self.attrs.get("quant_mode"))
+        else:
+            if "quant_mode" in self.attrs:
+                quant_type = QuantType.from_str(self.attrs.get("quant_mode"))
+            else:
+                quant_type = QuantType.from_str(self.attrs.get("platform_quant"))
+        self.attrs["quant_type"] = quant_type
 
 
 class iqUnaryOperator(UnaryOperator):

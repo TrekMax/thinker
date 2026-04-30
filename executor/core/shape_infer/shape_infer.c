@@ -3,8 +3,6 @@
 #include "thinker_log.h"
 
 
-#define ALIGN16(n) ((n+15)&~15)
-
 static tStatus tScalarGraphInit(const char *ptr, tScalarGraph *graph)
 {
   graph->num_input_ = *(int32_t *)ptr;

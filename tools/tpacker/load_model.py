@@ -131,7 +131,7 @@ def _convert_attr(attrs: Dict) -> Dict:
 def _convert_op_type(op_type: str) -> str:
     map_dict = {
         "QBatchNorm2d": "BatchNorm2dInt",
-        "QLayerNorm2d": "LayerNormInt",
+        "QLayerNorm": "LayerNormInt",
         "QLinear": "LinearInt",
         "QConv1d": "Conv1dInt",
         "QConv2d": "Conv2dInt",
@@ -151,7 +151,10 @@ def _convert_op_type(op_type: str) -> str:
         "QSoftmax": "SoftmaxInt",
         "QLSTM":"LSTMInt",
         "QGRU":"GRUInt",
-        "Pad":"iqPad"
+        "Pad":"iqPad",
+        "QGelu": "Gelu",
+        "QSwish":"Swish",
+        "QGLU": "GluInt"
     }
     return map_dict.get(op_type, op_type)
 

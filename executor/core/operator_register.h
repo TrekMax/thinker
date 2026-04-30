@@ -12,14 +12,6 @@
 extern "C" {
 #endif
 
-// Alignment macros for memory alignment
-#define ALIGN2(n) ((n + 1) & ~1)
-#define ALIGN4(n) ((n + 3) & ~3)
-#define ALIGN8(n) ((n + 7) & ~7)
-#define ALIGN16(n) ((n + 15) & ~15)
-#define ALIGN32(n) ((n + 31) & ~31)
-#define ALIGN64(n) ((n + 63) & ~63)
-
 // Macro concatenation helpers
 #define CONCAT_(f, __OP__) _##__OP__##f
 #define CONCAT(f, __OP__) CONCAT_(f, __OP__)

@@ -16,8 +16,10 @@
 #include "luna/luna_mtq_math.h"
 #endif
 
+#if THINKER_USE_VENUSA
 #if !(defined(WIN32) || defined(linux))
 #include "core_feature_cache.h"
+#endif
 #endif
 
 #define __ARM_FEATURE_FP16_VECTOR_ARITHMETIC 0

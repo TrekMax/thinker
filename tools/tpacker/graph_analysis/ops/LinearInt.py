@@ -19,8 +19,11 @@ class LinearIntAttrs(OperatorAttrs):
         platform = self.attrs.get("platform", "venus")
         if platform in {"arcs", "venusA"}:
             quant_type = RoundMethod.from_str(self.attrs.get("quant_mode"))
-        elif platform == "venus":
-            quant_type = QuantType.from_str(self.attrs.get("platform_quant"))
+        else:
+            if "quant_mode" in self.attrs:
+                quant_type = QuantType.from_str(self.attrs.get("quant_mode"))
+            else:
+                quant_type = QuantType.from_str(self.attrs.get("platform_quant"))
         self.attrs['quant_mode'] = quant_type
 
         transB = self.attrs.get("transB", 1)
@@ -47,9 +50,12 @@ class LinearInt(Operator):
         W = inputs[1]
         x_shape = list(X.shape)
         w_shape = list(W.shape)
-
-        assert X.dtype in (np.int8,), "Input must be of type int8"
-        assert W.dtype in (np.int8,), "Weight must be of type int8"
+        if X.dtype == np.int8:
+            assert W.dtype == np.int8, "Weight must be of type int8"
+        elif X.dtype == np.int32:
+            assert W.dtype == np.int32, "Weight must be of type int32"
+        else:
+            raise ValueError("Input must be of type int8 or int32")
         assert len(inputs) in {2, 3}, "LinearInt operator must have 2 or 3 inputs"
 
         # Calculate input dimensions
@@ -159,17 +165,30 @@ class LinearInt(Operator):
                         workspace_size = input_size * 2
                     else:
                         workspace_size = (input_size + output_size) * 2
-            else:
-                if out.mem_type != MemType.SHARE_MEM:
-                    if ALIGN2(L) * ALIGN4(M) <= 32768: 
-                        workspace_size = (input_size + output_size) * 4
-                    else:
-                        workspace_size = (output_size + max(input_size, output_size)) * 4
-                else:
-                    if ALIGN2(L) * ALIGN4(M) <= 32768: 
-                        workspace_size = input_size * 4
-                    else:
-                        workspace_size = (input_size + output_size) * 4
+            elif out.dtype == np.int32:  # int32 output
+                # Distinguish by input dtype
+                if data.dtype == np.int32:  # Int32 input + Int32 weight + Int32 output
+                    if out.mem_type != MemType.SHARE_MEM:  # output in PSRAM (y_in_psram=1)
+                        if ALIGN2(L) * ALIGN4(M) <= 32768:
+                            workspace_size = input_size * 4 + output_size * 4
+                        else:
+                            workspace_size = max(input_size, output_size) * 4 + output_size * 4
+                    else:  # output in ShareRAM (y_in_psram=0)
+                        if ALIGN2(L) * ALIGN4(M) <= 32768:
+                            workspace_size = input_size * 4
+                        else:
+                            workspace_size = input_size * 4 + output_size * 4
+                else:  # Int8 input + Int8 weight + Int32 output
+                    if out.mem_type != MemType.SHARE_MEM:  # output in PSRAM (y_in_psram=1)
+                        if ALIGN2(L) * ALIGN4(M) <= 32768:
+                            workspace_size = input_size + output_size * 4
+                        else:
+                            workspace_size = max(input_size, output_size * 4) + output_size * 4
+                    else:  # output in ShareRAM (y_in_psram=0)
+                        if ALIGN2(L) * ALIGN4(M) <= 32768:
+                            workspace_size = input_size
+                        else:
+                            workspace_size = input_size + output_size * 4
         elif platform == "venus":
             if len(self.inputs) > 2:
                 workspace_size = out.nbytes * self.inputs[2].dtype.itemsize

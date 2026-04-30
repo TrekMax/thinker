@@ -957,11 +957,14 @@ tStatus tForward(const tExecHandle hdl) {
     for (ii = 0; ii < num_tensor; ++ii) {
       local_tensor[ii] = inst->tensor_ + tensor_ids[ii];
     }
-    PROFILE_BEGIN
-    THINKER_RET_CHECK(op_api->forward(op, local_tensor, num_tensor, inst->dma_list_), "{op->api->forward}");
-  //  printf("[%d]op_name:%s\n", i, op_api->name());
     tTensorName *name_list =
         (tTensorName *)inst->model_->debug_info->tensor_name_list_;
+    PROFILE_BEGIN
+    tStatus ret = op_api->forward(op, local_tensor, num_tensor, inst->dma_list_);
+    if (ret != T_SUCCESS) {
+        printf("index:%d, op_name:%s, forward failed and ret=%d \n", i, op_api->name(), ret);
+        return ret;
+    }
 
 #if THINKER_DUMP 
 #if (defined(WIN32) || defined(linux))

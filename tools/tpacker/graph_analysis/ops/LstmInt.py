@@ -31,8 +31,11 @@ class LstmIntAttrs(OperatorAttrs):
         platform = self.attrs.get("platform", "venus")
         if platform in {"arcs", "venusA"}:
             quant_type = RoundMethod.from_str(self.attrs.get("quant_mode"))
-        elif platform == "venus":
-            quant_type = QuantType.from_str(self.attrs.get("platform_quant"))
+        else:
+            if "quant_mode" in self.attrs:
+                quant_type = QuantType.from_str(self.attrs.get("quant_mode"))
+            else:
+                quant_type = QuantType.from_str(self.attrs.get("platform_quant"))
         self.attrs["quant_mode"] = quant_type
 
         assert "scale_x" in self.attrs, "Missing required attribute: scale_x"
@@ -140,7 +143,6 @@ class LSTMInt(Operator):
 
         if platform in {"arcs", "venusA"}:
             workspace_size += h2h_weight.nbytes + i2h_weight.nbytes + i2h_bias.nbytes + h2h_bias.nbytes
-            # workspace_size += i2h_bias.nbytes + h2h_bias.nbytes
 
         if workspace_size != 0:
             return [Tensor.from_shape([workspace_size], np.int8, MemType.SHARE_MEM)]

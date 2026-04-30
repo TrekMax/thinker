@@ -90,10 +90,10 @@ class SoftmaxInt(iqUnaryOperator):
             else:
                 workspace_sizes += input_size * 4
             workspace_sizes += stride * 4
+            workspace_sizes = min(workspace_sizes, 65536)
         else:
             workspace_sizes = input_shape[axis] * 2
 
-        workspace_sizes = min(workspace_sizes, 65536)
         if workspace_sizes != 0:
             max_workspace = Tensor.from_shape([workspace_sizes], np.int8, MemType.SHARE_MEM)
             return [max_workspace]

@@ -25,7 +25,7 @@
 // Version macros
 #define THINKER_VERSION_MAJOR 3
 #define THINKER_VERSION_MINOR 0
-#define THINKER_VERSION_PATCH 8
+#define THINKER_VERSION_PATCH 9
 #define THINKER_VERSION      \
   STR(THINKER_VERSION_MAJOR) \
   "." STR(THINKER_VERSION_MINOR) "." STR(THINKER_VERSION_PATCH)
@@ -37,6 +37,14 @@
 #else
 #define VENUS_VERSION   "0.0.0.0"
 #endif
+
+// Alignment macros for memory alignment
+#define ALIGN2(n) ((n + 1) & ~1)
+#define ALIGN4(n) ((n + 3) & ~3)
+#define ALIGN8(n) ((n + 7) & ~7)
+#define ALIGN16(n) ((n + 15) & ~15)
+#define ALIGN32(n) ((n + 31) & ~31)
+#define ALIGN64(n) ((n + 63) & ~63)
 
 // IO Header structure
 typedef struct _thinker_IO_Header_ {
