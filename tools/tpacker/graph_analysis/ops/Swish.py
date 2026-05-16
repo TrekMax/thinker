@@ -23,7 +23,7 @@ class SwishOperatorAttrs(OperatorAttrs):
 
 
 @register_op
-class Swish(Operator):
+class QSwish(Operator):
     """Quantized Swish activation function (β=1).
 
     Swish(x) = x * sigmoid(x), also known as SiLU (Sigmoid-weighted Linear Unit).
@@ -132,4 +132,4 @@ class Swish(Operator):
         return flops
 
 
-__all__ = ["Swish"]
+__all__ = ["QSwish"]

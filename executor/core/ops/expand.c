@@ -1,20 +1,124 @@
 #undef __OP__
 #define __OP__ Expand
+#include <limits.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 #include "thinker_status.h"
 #include "core/operator_attrs.h"
 #include "core/operator_register.h"
 #include "core/comm/utils.h"
-#include "core/comm/type_switch.h"
+
+#if THINKER_USE_ARCS || THINKER_USE_VENUSA
+#include "arcs/luna/opi_psram_cpy.h"
+#endif
 
 #ifdef THINKER_USE_ARCS
-#include "arcs/luna/opi_psram_cpy.h"
+#include "arcs/luna/luna_misc_math.h"
 #endif
 
 #ifdef THINKER_USE_VENUSA
 #include "./venusA/luna/luna_matrix_math.h"
 #include "./venusA/luna/luna_misc_math.h"
 #endif
+
+#define EXPAND_MAX_DIMS 7
+
+static int32_t expand_checked_mul_size(size_t lhs, size_t rhs, size_t *out) {
+    if (rhs != 0 && lhs > ((size_t)INT_MAX / rhs)) {
+        return T_ERR_INVALID_DATA;
+    }
+    *out = lhs * rhs;
+    return T_SUCCESS;
+}
+
+static int32_t expand_copy_bytes(uint8_t *dst, const uint8_t *src, size_t size,
+                                 bool dst_in_psram) {
+    if (size == 0 || dst == src) {
+        return T_SUCCESS;
+    }
+
+#if THINKER_USE_ARCS || THINKER_USE_VENUSA
+    if (dst_in_psram) {
+        opi_psram_cpy_out(dst, (void *)src, (int32_t)size);
+    } else {
+        return luna_memcpy_i8o8((int8_t *)dst, (int8_t *)src, (uint32_t)size);
+    }
+#else
+    memcpy(dst, src, size);
+#endif
+    return T_SUCCESS;
+}
+
+static int32_t expand_repeat_block(uint8_t *dst, size_t block_bytes,
+                                   size_t repeat, bool dst_in_psram) {
+    size_t filled = block_bytes;
+    size_t total = block_bytes * repeat;
+
+    while (filled < total) {
+        size_t copy_bytes = total - filled;
+        if (copy_bytes > filled) {
+            copy_bytes = filled;
+        }
+        int32_t ret = expand_copy_bytes(dst + filled, dst, copy_bytes, dst_in_psram);
+        if (ret != T_SUCCESS) {
+            return ret;
+        }
+        filled += copy_bytes;
+    }
+    return T_SUCCESS;
+}
+
+static int32_t expand_shapes_equal_from(int32_t dim, int32_t ndim,
+                                        const uint32_t *in_shape,
+                                        const uint32_t *out_shape) {
+    for (int32_t i = dim; i < ndim; ++i) {
+        if (in_shape[i] != out_shape[i]) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+static int32_t expand_copy_dim(uint8_t *dst, const uint8_t *src, int32_t dim,
+                               int32_t ndim, const uint32_t *in_shape,
+                               const uint32_t *out_shape,
+                               const size_t *in_stride_bytes,
+                               const size_t *out_stride_bytes,
+                               size_t elem_bytes, bool dst_in_psram) {
+    if (dim == ndim) {
+        return expand_copy_bytes(dst, src, elem_bytes, dst_in_psram);
+    }
+
+    if (expand_shapes_equal_from(dim, ndim, in_shape, out_shape)) {
+        return expand_copy_bytes(dst, src, out_stride_bytes[dim] * out_shape[dim],
+                                 dst_in_psram);
+    }
+
+    if (in_shape[dim] == out_shape[dim]) {
+        for (uint32_t i = 0; i < out_shape[dim]; ++i) {
+            int32_t ret = expand_copy_dim(dst + i * out_stride_bytes[dim],
+                                          src + i * in_stride_bytes[dim],
+                                          dim + 1, ndim, in_shape, out_shape,
+                                          in_stride_bytes, out_stride_bytes,
+                                          elem_bytes, dst_in_psram);
+            if (ret != T_SUCCESS) {
+                return ret;
+            }
+        }
+    } else {
+        int32_t ret = expand_copy_dim(dst, src, dim + 1, ndim, in_shape,
+                                      out_shape, in_stride_bytes,
+                                      out_stride_bytes, elem_bytes,
+                                      dst_in_psram);
+        if (ret != T_SUCCESS) {
+            return ret;
+        }
+        return expand_repeat_block(dst, out_stride_bytes[dim], out_shape[dim],
+                                   dst_in_psram);
+    }
+    return T_SUCCESS;
+}
 
 /**
  * Forward pass implementation for Expand operator
@@ -26,14 +130,15 @@
  * @return: Status code indicating success or failure
  */
 int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_List *list) {
+    (void)list;
+
     // Validate tensor count
-    CHECK_GE(num_tensor, (op->num_input_ + op->num_output_));
-    if (num_tensor < 3) 
-        return T_ERR_INVALID_PARA;
+    CHECK_EQ(num_tensor, (op->num_input_ + op->num_output_));
 
     // Get input and output tensors
     tTensor *X = (tTensor *)tensors[0];
     tTensor *Y = (tTensor *)tensors[op->num_input_];
+    bool dst_in_psram = Y->mem_.type_ != 2;
 
     // Get shape information
     int32_t xdim = X->shape_.ndim_;
@@ -41,102 +146,86 @@ int32_t X(Forward)(tOperator *op, tTensor **tensors, int32_t num_tensor, tDMA_Li
     const uint32_t *tShape = X->shape_.dims_;
     const uint32_t *yshape = Y->shape_.dims_;
 
+#ifdef RUNTIME_PARAM_CHECK
+    if (xdim <= 0 || ydim < xdim || xdim > EXPAND_MAX_DIMS || ydim > EXPAND_MAX_DIMS) {
+        return T_ERR_INVALID_PARA;
+    }
+
+    if (X->dtype_ != Y->dtype_ || X->byte_ != Y->byte_ || X->byte_ == 0) {
+        return T_ERR_INVALID_DATATYPE;
+    }
+#endif
+
     // Calculate leading dimension multiplier
     int32_t bl = ydim - xdim;
-    int32_t leading = 1;
+    size_t leading = 1;
     for (int32_t i = 0; i < bl; ++i) {
-        leading *= yshape[i];
+        if (expand_checked_mul_size(leading, yshape[i], &leading) != T_SUCCESS) {
+            return T_ERR_INVALID_DATA;
+        }
     }
 
-    // Calculate expanded size and shape
-    int32_t size = 1;
-    uint32_t expandshape[7];
-    for (int32_t i = bl; i < ydim; ++i) {
-        size *= yshape[i];
-        expandshape[i - bl] = yshape[i];
+    const uint32_t *expandshape = yshape + bl;
+    for (int32_t i = 0; i < xdim; ++i) {
+        if (tShape[i] != expandshape[i]) {
+            if (tShape[i] != 1 || expandshape[i] == 0) {
+                return T_ERR_INVALID_DATA;
+            }
+        }
     }
 
-    // Process data based on data type
-#if THINKER_USE_VENUS
-    DATA_TYPE_SWITCH_ALL(X->dtype_, Type, {
-        const Type *input = (Type *)X->dptr_;
-        Type *output = (Type *)Y->dptr_;
-        int32_t ndim = xdim;
-        int32_t input_accumu[7];
-        int32_t output_accumu[7];
-        
-        // Calculate accumulation factors for indexing
-        input_accumu[ndim - 1] = output_accumu[ndim - 1] = 1;
-        for (int32_t i = ndim - 1; i > 0; i--) {
-            input_accumu[i - 1] = input_accumu[i] * tShape[i];
-            output_accumu[i - 1] = output_accumu[i] * expandshape[i];
+    size_t base_elems = 1;
+    for (int32_t i = 0; i < xdim; ++i) {
+        if (expand_checked_mul_size(base_elems, expandshape[i], &base_elems) != T_SUCCESS) {
+            return T_ERR_INVALID_DATA;
         }
-        
-        // Copy data element by element
-        for (int32_t i = 0; i < size; ++i) {
-            int32_t inputIdx = 0;
-            int32_t i_ = i;
-            for (int32_t j = 0; j < ndim; ++j) {
-                int32_t outIdx = i_ / output_accumu[j];
-                inputIdx += (outIdx % tShape[j]) * input_accumu[j];
-                i_ %= output_accumu[j];
-            }
-            output[i] = input[inputIdx];
+    }
+
+    size_t base_bytes = 0;
+    if (expand_checked_mul_size(base_elems, X->byte_, &base_bytes) != T_SUCCESS) {
+        return T_ERR_INVALID_DATA;
+    }
+
+    size_t total_bytes = 0;
+    if (expand_checked_mul_size(base_bytes, leading, &total_bytes) != T_SUCCESS) {
+        return T_ERR_INVALID_DATA;
+    }
+    if (total_bytes == 0) {
+        return T_SUCCESS;
+    }
+
+    uint8_t *output = (uint8_t *)Y->dptr_;
+    const uint8_t *input = (const uint8_t *)X->dptr_;
+
+    if (xdim == 0) {
+        THINKER_RET_CHECK(expand_copy_bytes(output, input, X->byte_, dst_in_psram),
+                          "expand_copy_bytes");
+        return expand_repeat_block(output, X->byte_, leading, dst_in_psram);
+    }
+
+    size_t input_stride_bytes[EXPAND_MAX_DIMS];
+    size_t output_stride_bytes[EXPAND_MAX_DIMS];
+    input_stride_bytes[xdim - 1] = X->byte_;
+    output_stride_bytes[xdim - 1] = X->byte_;
+    for (int32_t i = xdim - 1; i > 0; --i) {
+        if (expand_checked_mul_size(input_stride_bytes[i], tShape[i],
+                                    &input_stride_bytes[i - 1]) != T_SUCCESS) {
+            return T_ERR_INVALID_DATA;
         }
-        
-        // Copy expanded regions
-        for (int32_t i = 1; i < leading; ++i) {
-            memcpy(output + i * size * sizeof(Type), output, size * sizeof(Type));
+        if (expand_checked_mul_size(output_stride_bytes[i], expandshape[i],
+                                    &output_stride_bytes[i - 1]) != T_SUCCESS) {
+            return T_ERR_INVALID_DATA;
         }
-    });
-#elif THINKER_USE_ARCS || THINKER_USE_VENUSA
-    // if(xdim == ydim && tShape[xdim - 1] == 1 && tShape[xdim -1] != yshape[xdim -1] && X->dtype_ == Int8)
-    // {
-    //     int32_t expand_dim = xdim -1;
-    //     uint32_t expand_num = yshape[expand_dim] / tShape[expand_dim];
-    //     uint32_t data_size = getTensorSize(X);
-    //     int8_t *tmp = (int8_t *)Y->dptr_;
-    //     int8_t *psrc = (int8_t *)X->dptr_;
-    //     int8_t *pdst = (int8_t *)Y->dptr_;
-    //     //[F,1] * [1,B]=>[F,B]
-    //     if (ALIGN4(data_size) * 8 > 65536)
-    //         return T_ERR_FAIL;
-    //     THINKER_RET_CHECK(luna_memset_i8o8(tmp, 1, expand_num), "luna_memset_i8o8");
-    //     THINKER_RET_CHECK(luna_mat_mul_i8i8o8(psrc, tmp, pdst, data_size, 1, expand_num, 0), "luna_mat_mul_i8i8o8");
-    //     return T_SUCCESS;
-    // }
-    DATA_TYPE_SWITCH_ALL(X->dtype_, Type, {
-        const Type *input = (Type *)X->dptr_;
-        Type *output = (Type *)Y->dptr_;
-        int32_t ndim = xdim;
-        int32_t input_accumu[7];
-        int32_t output_accumu[7];
-        
-        // Calculate accumulation factors for indexing
-        input_accumu[ndim - 1] = output_accumu[ndim - 1] = 1;
-        for (int32_t i = ndim - 1; i > 0; i--) {
-            input_accumu[i - 1] = input_accumu[i] * tShape[i];
-            output_accumu[i - 1] = output_accumu[i] * expandshape[i];
-        }
-        
-        // Copy data element by element
-        for (int32_t i = 0; i < size; ++i) {
-            int32_t inputIdx = 0;
-            int32_t i_ = i;
-            for (int32_t j = 0; j < ndim; ++j) {
-                int32_t outIdx = i_ / output_accumu[j];
-                inputIdx += (outIdx % tShape[j]) * input_accumu[j];
-                i_ %= output_accumu[j];
-            }
-            output[i] = input[inputIdx];
-        }
-        
-        // Copy expanded regions
-        for (int32_t i = 1; i < leading; ++i) {
-            opi_psram_cpy_out(output + i * size * sizeof(Type), output, size * sizeof(Type));
-        }
-    });
-#endif
+    }
+
+    THINKER_RET_CHECK(expand_copy_dim(output, input, 0, xdim, tShape,
+                                      expandshape, input_stride_bytes,
+                                      output_stride_bytes, X->byte_,
+                                      dst_in_psram),
+                      "expand_copy_dim");
+    THINKER_RET_CHECK(expand_repeat_block(output, base_bytes, leading,
+                                          dst_in_psram),
+                      "expand_repeat_block");
 
     return T_SUCCESS;
 }

@@ -2,7 +2,7 @@
 // Swish(x) = x * sigmoid(x), also known as SiLU
 
 #undef __OP__
-#define __OP__ Swish
+#define __OP__ QSwish
 #include "core/operator_register.h"
 #include "thinker_status.h"
 

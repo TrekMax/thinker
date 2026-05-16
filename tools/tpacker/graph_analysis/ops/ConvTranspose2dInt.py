@@ -13,13 +13,17 @@ class ConvTranspose2dIntAttrs(OperatorAttrs):
         """Check and validate the parameters for ConvTranspose2dInt operation."""
         platform = self.attrs.get("platform", "venus")
         if platform in {"arcs", "venusA"}:
-            quant_type = RoundMethod.from_str(self.attrs.get("quant_mode"))
+            assert "quant_mode" in self.attrs, "Missing required attribute: quant_mode"
         else:
             if "quant_mode" in self.attrs:
-                quant_type = QuantType.from_str(self.attrs.get("quant_mode"))
+                quant_mode = self.attrs.get("quant_mode")
+                if quant_mode == "luna_quant":
+                    quant_mode = "FLOOR_ADD"
             else:
-                quant_type = QuantType.from_str(self.attrs.get("platform_quant"))
-        self.attrs["quant_mode"] = quant_type
+                quant_mode = self.attrs.get("platform_quant")
+                if quant_mode == "luna_quant":
+                    quant_mode = "FLOOR_ADD"
+            self.attrs['quant_mode'] = quant_mode
 
         # Check required attributes
         required_attrs = [
@@ -85,7 +89,7 @@ class ConvTranspose2dIntAttrs(OperatorAttrs):
         act_type = int(self.attrs.get("act_type", 0))
         self.attrs["act_type"] = act_type
 
-        assert self.attrs.get("o_bits") == 8, "Conv1dInt just support output of int8"
+        assert self.attrs.get("o_bits") in (8, 16, 32), "ConvTranspose2dInt output bits must be 8, 16, or 32"
 
     def serialize(self) -> bytes:
         """Serialize the attributes into bytes for the ConvTranspose2dInt operation."""
@@ -96,7 +100,7 @@ class ConvTranspose2dIntAttrs(OperatorAttrs):
         attrs.output_padding = self.attrs.get("output_padding", (0, 0, 0, 0))
         attrs.stride = self.attrs["strides"]
         attrs.group = self.attrs["group"]
-        attrs.quant_type = self.attrs["quant_mode"].value
+        attrs.quant_type = RoundMethod.from_str(self.attrs["quant_mode"]).value
         attrs.act_type = self.attrs["act_type"]
         return bytes(tffi.buffer(attrs))
 

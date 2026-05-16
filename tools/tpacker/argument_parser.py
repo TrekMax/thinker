@@ -185,7 +185,7 @@ def parse_arguments() -> Tuple[argparse.Namespace, Dict, Dict]:
         "-o", "--output_path", default="model.pkg", type=str, help="Output file path"
     )
     parser.add_argument(
-        "-d", "--dump", default='True', type=parse_boolean,
+        "-d", "--dump", default='False', type=parse_boolean,
         help="Switch for print intermediate information"
     )
 

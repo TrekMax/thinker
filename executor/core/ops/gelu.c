@@ -1,7 +1,7 @@
 // GELU operator implementation
 
 #undef __OP__
-#define __OP__ Gelu
+#define __OP__ QGelu
 #include "core/operator_register.h"
 #include "thinker_status.h"
 

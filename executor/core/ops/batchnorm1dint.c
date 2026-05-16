@@ -1,21 +1,12 @@
 #undef __OP__
-#define __OP__ BatchNorm2dInt
+#define __OP__ BatchNorm1dInt
 #include "core/comm/thinker_log.h"
 #include "core/comm/utils.h"
 #include "core/operator_attrs.h"
 #include "core/operator_register.h"
 
-// Include platform-specific implementations
-#ifdef THINKER_USE_VENUS
-#include "./venus/batchnormint.h"
-#endif
-
-#ifdef THINKER_USE_ARCS
-#include "./arcs/batchnormint.h"
-#endif
-
 #ifdef THINKER_USE_VENUSA
-#include "./venusA/batchnormint.h"
+#include "./venusA/batchnorm1dint.h"
 #endif
 
 // Forward pass implementation for Batch Normalization Integer operator
@@ -30,7 +21,7 @@ int32_t X(Forward)(tOperator* op, tTensor** tensors, int32_t num_tensor, tDMA_Li
     tTensor* Y = ((tTensor**)tensors)[op->num_input_];  // Output tensor
 
     // Check if any platform is enabled
-#if THINKER_USE_VENUS || THINKER_USE_ARCS || THINKER_USE_VENUSA
+#if THINKER_USE_VENUSA
     #if THINKER_PROFILE
     uint64_t start_t = tick_count();  // Record start time for profiling
     #endif
@@ -39,12 +30,12 @@ int32_t X(Forward)(tOperator* op, tTensor** tensors, int32_t num_tensor, tDMA_Li
     tTensor *Workspace = NULL;
     if (num_tensor > op->num_input_ + op->num_output_)
         Workspace = tensors[op->num_input_ + op->num_output_];
-    THINKER_RET_CHECK(batchnormint_luna(X, W, Bias, Y, Workspace), "batchnormint_luna");
+    THINKER_RET_CHECK(batchnorm1dint_luna(X, W, Bias, Y, Workspace), "batchnormint_luna");
 
     #if THINKER_PROFILE
     uint64_t finish_t = tick_count();  // Record end time for profiling
     uint32_t total_t = (uint32_t)(finish_t - start_t);
-    printf("%8s | %u | (","BatchNorm2dInt", total_t);  
+    printf("%8s | %u | (","BatchNorm1dInt", total_t);  
     #endif
 #endif
 

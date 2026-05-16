@@ -43,9 +43,9 @@ class SoftmaxInt(iqUnaryOperator):
 
         # Check softmax dimension limit
         if is_sympy(X.shape[axis]):
-            assert calc_expr(str(X.shape[axis]), dynamic_shape) <= 2048, "Exceed softmax limit of arcs"
+            assert calc_expr(str(X.shape[axis]), dynamic_shape) <= 2048, "Exceed softmax limit"
         else:
-            assert X.shape[axis] <= 2048, "Exceed softmax limit of arcs"
+            assert X.shape[axis] <= 2048, "Exceed softmax limit"
 
         # Handle scale_x
         scale_x = self.attrs.get("scale_x")

@@ -1,5 +1,6 @@
 from .activations import *
 from .ArgMax import *
+from .BatchNorm1dInt import *
 from .BatchNorm2dInt import *
 from .Binary_ElementWise_Ops import *
 from .BmmInt import *

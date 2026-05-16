@@ -20,13 +20,17 @@ class Conv1dIntAttrs(OperatorAttrs):
         """Check and validate the parameters for Conv1dInt operation."""
         platform = self.attrs.get("platform", "venus")
         if platform in {"arcs", "venusA"}:
-            quant_type = RoundMethod.from_str(self.attrs.get("quant_mode"))
+            assert "quant_mode" in self.attrs, "Missing required attribute: quant_mode"
         else:
             if "quant_mode" in self.attrs:
-                quant_type = QuantType.from_str(self.attrs.get("quant_mode"))
+                quant_mode = self.attrs.get("quant_mode")
+                if quant_mode == "luna_quant":
+                    quant_mode = "FLOOR_ADD"
             else:
-                quant_type = QuantType.from_str(self.attrs.get("platform_quant"))
-        self.attrs["quant_mode"] = quant_type
+                quant_mode = self.attrs.get("platform_quant")
+                if quant_mode == "luna_quant":
+                    quant_mode = "FLOOR_ADD"
+            self.attrs['quant_mode'] = quant_mode
 
         # Check required attributes
         required_attrs = [
@@ -82,7 +86,7 @@ class Conv1dIntAttrs(OperatorAttrs):
         attrs.pad = self.attrs["pads"]
         attrs.stride = self.attrs["strides"][0]
         attrs.group = self.attrs["group"]
-        attrs.quant_type = self.attrs["quant_mode"].value
+        attrs.quant_type = RoundMethod.from_str(self.attrs["quant_mode"]).value
         attrs.act_type = self.attrs.get("act_type", 0)
         return bytes(tffi.buffer(attrs))
 
@@ -139,11 +143,8 @@ class Conv1dInt(Operator, ConvLayout):
         if platform == "venus":
             assert X.dtype == np.int8
             assert data_bits == 8, f"data type:{X.dtype} must match data bits:{data_bits}"
-            assert W.dtype in (np.int8, np.int16)
-            if W.dtype == np.int8:
-                assert parameter_bits == 8, f"weight type:{W.dtype} must match weight bits:{parameter_bits}"
-            else:
-                assert parameter_bits == 16, f"weight type:{W.dtype} must match weight bits:{parameter_bits}"
+            assert W.dtype == np.int8
+            assert parameter_bits in (4, 8), f"weight type:{W.dtype} must match weight bits:{parameter_bits}"            
             assert output_bits in (8, 16, 32)
             dtype = (
                 np.int8

@@ -38,11 +38,16 @@ class topN(Operator, BaseLayout):
         if axis < 0:
             axis += ndims
 
+        platform = self.attrs.get("platform", "venus")
+        if platform == "venus":
+            assert inputs[0].dtype == np.int8, "topN on venus only supports int8 input"
+            assert N == 1, "topN on venus only supports max_num=1"
+            assert axis == ndims - 1, "topN on venus only supports the last axis"
+
         assert shape[0] == 1, "Only shape[0] == 1 is supported"
         shape[axis] = N
         shape[0] = 2
 
-        platform = self.attrs.get("platform", "venus")
         if platform in ["arcs", "venusA"]:
             Y = Tensor.clone(inputs[0], shape=tuple(shape), dtype=np.int32, bits=4)
         else:

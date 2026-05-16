@@ -2,7 +2,7 @@ import math
 import numpy as np
 
 from ..utils import AutoPad, CeilMode, combine4bit_8bit
-from ....enum_defines import Layout, MemType, ALIGN4, ALIGN8
+from ....enum_defines import Layout, MemType, ALIGN2, ALIGN4, ALIGN8
 
 
 def get_Conv1dInt_workspace(
@@ -78,17 +78,21 @@ def Conv1dInt_weight_rearrange(
         if group != 1:
             if group == kernel_num:
                 assert kernel_c == 1
+                num_input_align = kernel_c
                 num_output_align = ALIGN8(kernel_num)
-                kernel_size = num_output_align * kernel_h * kernel_w
-                group = num_output_align
+                kernel_h_align = ALIGN2(kernel_h)
+                kernel_size = num_output_align * kernel_h_align * kernel_w
                 assert kernel_size * weight.dtype.itemsize <= 32768, "kernel size of Conv1dInt must be less than 32KB"
 
-                new_weight_data = np.zeros((num_output_align, 1, kernel_w), weight.dtype)
-                for p in range(kernel_num):
-                    new_weight_data[p, :, :] = weight.data[p, :, :]
+                new_weight_data = np.zeros((num_output_align, kernel_h_align, kernel_w), weight.dtype)
 
-                new_weight_data = new_weight_data.reshape(-1, 8, 1, kernel_w)
-                new_weight_data = new_weight_data.transpose(0, 2, 3, 1)
+                for p in range(kernel_num):
+                    for q in range(kernel_h):
+                        new_weight_data[p, q, :] = weight.data[p, q, :]
+
+                new_weight_data = new_weight_data.reshape(-1, 4, 1, 2, kernel_w)
+                new_weight_data = new_weight_data.transpose(2, 4, 0, 3, 1)
+                new_weight.data = new_weight_data
                 new_weight.shape = new_weight_data.shape
                 new_weight.layout = Layout.NHWC8
 

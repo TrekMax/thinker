@@ -2,7 +2,7 @@ import math
 import numpy as np
 from ...resource_packer._type._ctype import tffi
 from ...graph import Tensor
-from ...enum_defines import DevType, MemType
+from ...enum_defines import DevType, MemType, ALIGN4, ALIGN8
 from ...xsympy import is_sympy
 from .utils import QuantType, calc_expr
 from .base import Operator, OperatorAttrs, register_op
@@ -37,8 +37,6 @@ class GRUInt(Operator):
         # inputs ==6; input,hx iw,hw,ib,hb
         if len(inputs) == 6:
             self.weight_index = 2
-        else:
-            self.weight_index = 1
         X = inputs[0]  # Input tensor
         i2h_w = inputs[self.weight_index]  # Input-to-hidden weights
         h2h_w = inputs[self.weight_index + 1]  # Hidden-to-hidden weights
@@ -95,6 +93,9 @@ class GRUInt(Operator):
 
     def get_workspace(self):
         """Calculate the required workspace for the GRUInt operation."""
+        X = self.inputs[0]
+        input_size = np.prod(X.shape)
+
         h2h_weight = self.inputs[self.weight_index + 1]
         hidden_size = h2h_weight.shape[1]
         platform = self.attrs.get("platform", "venus")
@@ -104,7 +105,10 @@ class GRUInt(Operator):
         else:
             T,B,L = self.inputs[0].shape
         if platform == "venus":
-            workspace_size = hidden_size * 4 * 3
+            assert B == 1, "Venus platform requires batch size of 1"
+            assert ALIGN8(input_size) * ALIGN4(hidden_size * 3) <= 32768, "The theoretical int32 scratch size exceeds the limit"
+            assert ALIGN8(hidden_size) * ALIGN4(hidden_size * 3) <= 32768, "Hidden size must be aligned to 4 and 8"
+            workspace_size = hidden_size * 4 * 3 * 2
         else:
             # Keep a guard band beyond the theoretical int32 scratch usage.
             # The runtime kernels operate on tightly packed scratch buffers,
@@ -117,12 +121,14 @@ class GRUInt(Operator):
 
     def pack_params(self):
         """Pack the parameters for the GRUInt operation, handling weight transposition."""
-        weight_i = self.inputs[self.weight_index]
-        weight_h = self.inputs[self.weight_index + 1]
-        data_i = weight_i.data
-        data_h = weight_h.data
-        self.inputs[self.weight_index].update(data=data_i, shape=data_i.shape)
-        self.inputs[self.weight_index + 1].update(data=data_h, shape=data_h.shape)
+        platform = self.attrs.get("platform", "venus")
+        if platform == "venus":
+            weight_i = self.inputs[self.weight_index]
+            weight_h = self.inputs[self.weight_index + 1]
+            data_i = weight_i.data.transpose(1, 0)
+            data_h = weight_h.data.transpose(1, 0)
+            self.inputs[self.weight_index].update(data=data_i, shape=data_i.shape)
+            self.inputs[self.weight_index + 1].update(data=data_h, shape=data_h.shape)
 
     def flops_counter(self, dynamic_shape) -> int:
         """Calculate the number of floating-point operations (FLOPs) for the GRUInt operation."""

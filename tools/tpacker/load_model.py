@@ -128,8 +128,24 @@ def _convert_attr(attrs: Dict) -> Dict:
             new_attrs[k] = v
     return new_attrs
 
+def _convert_attr2(attrs: Dict) -> Dict:
+    new_attrs = {}
+    for k, v in attrs.items():
+        if k == "x_bits":
+            new_attrs["data_bits"] = v
+        elif k == "w_bits":
+            new_attrs["parameter_bits"] = v
+        elif k == "stride":
+            new_attrs["strides"] = v
+        elif k== 'scale_x':
+            new_attrs['scale_i'] = v
+        else:
+            new_attrs[k] = v
+    return new_attrs
+
 def _convert_op_type(op_type: str) -> str:
     map_dict = {
+        "QBatchNorm1d": "BatchNorm1dInt",
         "QBatchNorm2d": "BatchNorm2dInt",
         "QLayerNorm": "LayerNormInt",
         "QLinear": "LinearInt",
@@ -152,8 +168,6 @@ def _convert_op_type(op_type: str) -> str:
         "QLSTM":"LSTMInt",
         "QGRU":"GRUInt",
         "Pad":"iqPad",
-        "QGelu": "Gelu",
-        "QSwish":"Swish",
         "QGLU": "GluInt"
     }
     return map_dict.get(op_type, op_type)
@@ -209,6 +223,10 @@ def _convert_from_onnx_model(graph_path: str, model_config: ModelConfig, is_dump
 
         onnx_attrs = _parse_attr(onnx_node.attribute)
         thinker_attrs = _convert_attr(onnx_attrs)
+        # if onnx_node.op_type != "QLSTM":
+        #     thinker_attrs = _convert_attr(onnx_attrs)
+        # else:
+        #     thinker_attrs = _convert_attr2(onnx_attrs)
 
         if 'platform' in thinker_attrs:
             if thinker_graph.platform != None:

@@ -6,7 +6,7 @@ from .base import Operator, OperatorAttrs, register_op
 class SplitAttrs(OperatorAttrs):
     def checkparams(self) -> None:
         """Check and validate Split attributes."""
-        assert "axis" in self.attrs and "dims" in self.attrs, "axis and dims must be specified"
+        assert "axis" in self.attrs and ("dims" in self.attrs or "split" in self.attrs), "axis and dims must be specified"
 
     def serialize(self) -> bytes:
         """Serialize Split attributes to bytes."""
@@ -37,6 +37,12 @@ class Split(Operator):
             elif isinstance(dims, list):
                 split = dims
             self.attrs["split"] = split
+
+        if self.attrs.get("dims",None) == None:
+            split = self.attrs.get("split",None)
+            split_num = len(split)
+            dims = split_num
+            self.attrs['dims']= dims
 
         split = self.attrs["split"]
         outputs = []

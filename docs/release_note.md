@@ -1,5 +1,16 @@
 # Release Notes
 
+## v3.0.10 - 2026-05-16
+
+- 版本升级至 `3.0.10`，同步 C API 与 Python 包版本；安装脚本调整为卸载/安装 `thinker` sdist 包，并默认关闭 tpacker dump。
+- 新增 `BatchNorm1dInt` 执行器、VenusA 内核和 tpacker 图分析支持；将 `BatchNormInt` 文件/注册梳理为 `BatchNorm2dInt`，并补充 VenusA 设备支持列表。
+- 调整算子命名与映射：执行器注册改用 `QGelu`、`QSwish`，ONNX 加载保留 `QGelu`/`QSwish` 原始算子类型并新增 `QBatchNorm1d` 到 `BatchNorm1dInt` 的转换。
+- 优化 VenusA 算子实现：增强 `Conv1dInt` 参数/类型校验和 `Int16` 输出，重构 `GLUInt`/`SoftmaxInt` 工作区拆分和 PSRAM 输出处理，修复/扩展 `GRUInt`、`LinearInt`、`iqAdd`、`LayerNormInt` 等实现。
+- 完善 tpacker 图分析：统一 `Conv1dInt`/`Conv2dInt`/`ConvTranspose2dInt`/`LinearInt` 等量化参数序列化，补充 `GLUInt`/`GRUInt`/`LinearInt` 工作区与数据类型约束，增强 `Quant`/`Requant`/`LogSoftmaxInt`/`Split`/`Tile`/`Unsqueeze` 等算子处理。
+- 大幅增强图优化与流式处理：`op_split` 支持 `Conv1dInt`/`Conv2dInt`/`ConvTranspose2dInt`/`LinearInt` 按硬件阈值拆分，增加 `LinearInt` 右维度拆分、`TopN`/`ArgMax` 融合路径和分支卷积 pad 处理。
+- 改进 tvalidator：为模型创建独立 `workspace/<model>` 目录，保存 Linger/Thinker 输入与 dump，支持 `Gather` indices 普通输入、`QGRU` 量化输入配置，并修正 LSTM/GRU stream hidden/cell 输入处理。
+- 更新 README、量化算子支持说明、环境文档和精度支持表，新增 `operator_support_list.png` 与 `operator_precision_support.xlsx`；删除 Venus/VenusA debug 静态库文件，减小发布内容。
+
 ## v3.0.9 - 2026-04-30
 
 来源提交：`b58e741`
@@ -78,4 +89,3 @@
 - 新增/同步执行器 C API、算子注册、shape infer、公共头文件，以及 Arcs、Venus、VenusA 多平台算子实现和运行库。
 - 新增/同步 tpacker、tprofile、tvalidator 工具链及安装、打包配置。
 - 新增动态库调用 demo、test_thinker demo 和 x86 Linux 构建/测试脚本。
-

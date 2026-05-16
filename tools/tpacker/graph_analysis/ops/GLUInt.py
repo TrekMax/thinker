@@ -28,6 +28,14 @@ class GluInt(Operator):
         X = inputs[0]
         shape = list(X.shape)
         axis = self.attrs['dim']
+        ndims = len(shape)
+        assert -ndims <= axis < ndims, "GluInt axis out of bounds"
+        platform = self.attrs.get("platform", "venus")
+        if platform == "venus":
+            assert axis < 0, "GluInt on venus only supports negative axis"
+            assert X.dtype == np.int8, "GluInt on venus only supports int8 input"
+        axis = axis + ndims if axis < 0 else axis
+        assert shape[axis] % 2 == 0, "GluInt split axis dimension must be even"
         shape[axis] = shape[axis] // 2
 
         # Process scales
@@ -45,6 +53,8 @@ class GluInt(Operator):
 
         # Determine output data type
         output_bits = self.attrs.get("o_bits")
+        if platform == "venus":
+            assert output_bits == 8, "GluInt on venus only supports int8 output"
         assert output_bits in (8, 16, 32), "Output bits must be 8, 16, or 32"
         dtype = np.int8 if output_bits == 8 else np.int16 if output_bits == 16 else np.int32
 
@@ -53,12 +63,7 @@ class GluInt(Operator):
 
     def get_workspace(self):
         """Calculate the required workspace for the GluInt operation."""
-        axis = self.attrs['dim']
-        M = 1
-        for i in range(axis):
-            M *= self.inputs[0].shape[i]
-        N = self.inputs[0].shape[axis]
-        workspace_size = M * N * 7
+        workspace_size = np.prod(self.inputs[0].shape) * 7
         if workspace_size != 0:
             return [Tensor.from_shape([workspace_size], np.int8, MemType.SHARE_MEM)]
         return []

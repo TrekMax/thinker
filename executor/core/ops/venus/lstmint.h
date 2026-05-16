@@ -90,7 +90,7 @@ static int32_t luna_lstm_q7_int8_inner(luna_lstm_param_t *params, int32_t t,
                                        int8_t *p_input, int8_t *p_output,
                                        int8_t *p_tmp) {
     const int32_t active_q_in = 11;
-    const int32_t active_q_out = 7;
+    const int32_t active_q_out = 15;
 
     // Pointer assignments
     int8_t *p_in = p_input;
@@ -159,30 +159,29 @@ static int32_t luna_lstm_q7_int8_inner(luna_lstm_param_t *params, int32_t t,
     int16_t *G_c = G_f + params->hidden_size;
     int16_t *G_o = G_c + params->hidden_size;
 
-    int8_t *g_i = (int8_t *)p_out2;
-    int8_t *g_f = g_i + params->hidden_size;
-    int8_t *g_c = g_f + params->hidden_size;
-    int8_t *g_o = g_c + params->hidden_size;
+    int16_t *g_i = (int16_t *)p_out2;
+    int16_t *g_f = g_i + params->hidden_size;
+    int16_t *g_c = g_f + params->hidden_size;
+    int16_t *g_o = g_c + params->hidden_size;
 
-    THINKER_RET_CHECK(API_LIB(sigmoid_int8)(G_i, g_i, params->hidden_size), "luna_sigmoid_int8");
-    THINKER_RET_CHECK(API_LIB(sigmoid_int8)(G_f, g_f, params->hidden_size), "luna_sigmoid_int8");
-    THINKER_RET_CHECK(API_LIB(tanh_int8)(G_c, g_c, params->hidden_size), "luna_tanh_int8");
-    THINKER_RET_CHECK(API_LIB(sigmoid_int8)(G_o, g_o, params->hidden_size), "luna_sigmoid_int8");
+    THINKER_RET_CHECK(API_LIB(sigmoid)(G_i, g_i, params->hidden_size), "luna_sigmoid");
+    THINKER_RET_CHECK(API_LIB(sigmoid)(G_f, g_f, params->hidden_size), "luna_sigmoid");
+    THINKER_RET_CHECK(API_LIB(tanh)(G_c, g_c, params->hidden_size), "luna_tanh");
+    THINKER_RET_CHECK(API_LIB(sigmoid)(G_o, g_o, params->hidden_size), "luna_sigmoid");
 
     // Step 5: Compute cell state and hidden state
-    int32_t *p_out3 = (int32_t *)p_out2 + params->hidden_size * 4;
+    int32_t *p_out3 = (int32_t *)p_out2 + params->hidden_size * 2;
     int32_t *p_out4 = p_out3 + params->hidden_size;
 
-    THINKER_RET_CHECK(API_LIB(scale_q7_int16)(g_f, 1, G_f, params->hidden_size, 0), "luna_scale_q7_int16");
-    THINKER_RET_CHECK(API_LIB(mul_q15_int32)(p_cell_in, G_f, p_out3, params->hidden_size, 0), "luna_mul_q15_int32");
-    THINKER_RET_CHECK(API_LIB(mul_q7_int32)(g_i, g_c, p_out4, params->hidden_size, 0), "luna_mul_q7_int32");
+    THINKER_RET_CHECK(API_LIB(mul_q15_int32)(p_cell_in, g_f, p_out3, params->hidden_size, 0), "luna_mul_q15_int32");
+    THINKER_RET_CHECK(API_LIB(mul_q15_int32)(g_i, g_c, p_out4, params->hidden_size, 0), "luna_mul_q7_int32");
     THINKER_RET_CHECK(API_LIB(add_q31_int32)(p_out3, p_out4, p_out3, params->hidden_size, 0), "luna_add_q31_int32");
     THINKER_RET_CHECK(API_LIB(scale_q31_int16)(p_out3, 1, p_cell_in, params->hidden_size, active_q_out), "luna_scale_q31_int16");
 
     THINKER_RET_CHECK(API_LIB(scale_q31_int16)(p_out3, 1, G_o, params->hidden_size,
                                 active_q_out + active_q_out - active_q_in), "luna_scale_q31_int16");
-    THINKER_RET_CHECK(API_LIB(tanh_int8)(G_o, g_i, params->hidden_size), "luna_tanh_int8");
-    THINKER_RET_CHECK(API_LIB(mul_q7_int8)(g_o, g_i, p_h_in, params->hidden_size,
+    THINKER_RET_CHECK(API_LIB(tanh)(G_o, g_i, params->hidden_size), "luna_tanh");
+    THINKER_RET_CHECK(API_LIB(mul_q15_int8)(g_o, g_i, p_h_in, params->hidden_size,
                                active_q_out + active_q_out - h_q), "luna_mul_q7_int8");
     THINKER_RET_CHECK(API_LIB(scale_q7_int8)(p_h_in, 1, p_out, params->hidden_size, 0), "luna_scale_q7_int8");
 

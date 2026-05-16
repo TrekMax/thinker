@@ -118,14 +118,17 @@ class iqUnaryOperatorAttrs(OperatorAttrs):
         """Normalize operator attributes."""
         platform = self.attrs.get("platform", "venus")
         if platform in {"arcs", "venusA"}:
-            quant_type = RoundMethod.from_str(self.attrs.get("quant_mode"))
+            assert "quant_mode" in self.attrs, "Missing required attribute: quant_mode"
         else:
             if "quant_mode" in self.attrs:
-                quant_type = QuantType.from_str(self.attrs.get("quant_mode"))
+                quant_mode = self.attrs.get("quant_mode")
+                if quant_mode == "luna_quant":
+                    quant_mode = "FLOOR_ADD"
             else:
-                quant_type = QuantType.from_str(self.attrs.get("platform_quant"))
-                
-        self.attrs["quant_mode"] = quant_type
+                quant_mode = self.attrs.get("platform_quant")
+                if quant_mode == "luna_quant":
+                    quant_mode = "FLOOR_ADD"
+            self.attrs['quant_mode'] = quant_mode
 
 
 class iqBinaryOperatorAttrs(OperatorAttrs):
@@ -137,13 +140,17 @@ class iqBinaryOperatorAttrs(OperatorAttrs):
         """Normalize operator attributes."""
         platform = self.attrs.get("platform", "venus")
         if platform in {"arcs", "venusA"}:
-            quant_type = RoundMethod.from_str(self.attrs.get("quant_mode"))
+            assert "quant_mode" in self.attrs, "Missing required attribute: quant_mode"
         else:
             if "quant_mode" in self.attrs:
-                quant_type = QuantType.from_str(self.attrs.get("quant_mode"))
+                quant_mode = self.attrs.get("quant_mode")
+                if quant_mode == "luna_quant":
+                    quant_mode = "FLOOR_ADD"
             else:
-                quant_type = QuantType.from_str(self.attrs.get("platform_quant"))
-        self.attrs["quant_type"] = quant_type
+                quant_mode = self.attrs.get("platform_quant")
+                if quant_mode == "luna_quant":
+                    quant_mode = "FLOOR_ADD"
+            self.attrs['quant_mode'] = quant_mode
 
 
 class iqUnaryOperator(UnaryOperator):

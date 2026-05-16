@@ -142,6 +142,8 @@ class Graph(object):
             inputs = [self.entries[x].tensor for x in node.inputs]
             if node.op is None:
                 node.create_op()
+            assert node.op is not None, f"Node '{node.name}' has no op."
+
             node.op.set_input(inputs)
             node.op.infer_tensor(self.dynamic_args_max)
             outputs = node.op.get_output()

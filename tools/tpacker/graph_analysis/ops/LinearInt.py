@@ -18,13 +18,17 @@ class LinearIntAttrs(OperatorAttrs):
         
         platform = self.attrs.get("platform", "venus")
         if platform in {"arcs", "venusA"}:
-            quant_type = RoundMethod.from_str(self.attrs.get("quant_mode"))
+            assert "quant_mode" in self.attrs, "Missing required attribute: quant_mode"
         else:
             if "quant_mode" in self.attrs:
-                quant_type = QuantType.from_str(self.attrs.get("quant_mode"))
+                quant_mode = self.attrs.get("quant_mode")
+                if quant_mode == "luna_quant":
+                    quant_mode = "FLOOR_ADD"
             else:
-                quant_type = QuantType.from_str(self.attrs.get("platform_quant"))
-        self.attrs['quant_mode'] = quant_type
+                quant_mode = self.attrs.get("platform_quant")
+                if quant_mode == "luna_quant":
+                    quant_mode = "FLOOR_ADD"
+            self.attrs['quant_mode'] = quant_mode
 
         transB = self.attrs.get("transB", 1)
         self.attrs['transB'] = transB
@@ -34,7 +38,7 @@ class LinearIntAttrs(OperatorAttrs):
         attrs = tffi.new("LinearIntAttrs *")
         attrs.transA = 0
         attrs.transB = self.attrs['transB']
-        attrs.quant_type = self.attrs["quant_mode"].value
+        attrs.quant_type = RoundMethod.from_str(self.attrs["quant_mode"]).value
         return bytes(tffi.buffer(attrs))
 
 @register_op
@@ -50,12 +54,16 @@ class LinearInt(Operator):
         W = inputs[1]
         x_shape = list(X.shape)
         w_shape = list(W.shape)
-        if X.dtype == np.int8:
-            assert W.dtype == np.int8, "Weight must be of type int8"
-        elif X.dtype == np.int32:
-            assert W.dtype == np.int32, "Weight must be of type int32"
+        platform = self.attrs.get("platform", "venus")
+        if platform == "venusA":
+            if X.dtype == np.int8:
+                assert W.dtype in (np.int8, np.int32), "Weight must be of type int8 or int32"
+            elif X.dtype == np.int32:
+                assert W.dtype in (np.int8, np.int32) , "Weight must be of type int8 or int32"
+            else:
+                raise ValueError("Input must be of type int8 or int32")
         else:
-            raise ValueError("Input must be of type int8 or int32")
+             assert X.dtype == np.int8 , "Input must be of type int8"
         assert len(inputs) in {2, 3}, "LinearInt operator must have 2 or 3 inputs"
 
         # Calculate input dimensions
@@ -141,33 +149,69 @@ class LinearInt(Operator):
                 assert N == weight.shape[1], "N must be equal to weight shape 1 when transB =1"
             input_size = M * N
             output_size = M * L
-
-            if out.dtype == np.int8:
-                workspace_size = input_size
-                if out.mem_type != MemType.SHARE_MEM:
-                    if ALIGN4(L) * ALIGN8(M) <= 65536: 
-                        workspace_size = input_size + output_size
+            weight_size = L * N
+            if data.dtype == np.int8:
+                if out.dtype == np.int8:
+                    if out.mem_type != MemType.SHARE_MEM and ALIGN4(L) * ALIGN8(M) > 65536:
+                        workspace_size = max(input_size, output_size)
                     else:
-                        workspace_size = output_size + max(input_size, output_size)
-                else:
-                    if ALIGN4(L) * ALIGN8(M) <= 65536: 
                         workspace_size = input_size
+                    if data.mem_type != MemType.SHARE_MEM and ALIGN4(L) * ALIGN8(M) > 65536:
+                        workspace_size += max(input_size, output_size)
+                    elif ALIGN4(L) * ALIGN8(M) > 65536:
+                        workspace_size += output_size
                     else:
-                        workspace_size = input_size + output_size
-            elif out.dtype == np.int16:
-                if out.mem_type != MemType.SHARE_MEM:
-                    if ALIGN4(L) * ALIGN4(M) <= 65536: 
-                        workspace_size = (input_size + output_size) * 2
+                        workspace_size += input_size
+                elif out.dtype == np.int16:
+                    if out.mem_type != MemType.SHARE_MEM:
+                        if ALIGN4(L) * ALIGN4(M) <= 65536: 
+                            workspace_size = (input_size + output_size) * 2
+                        else:
+                            workspace_size = (output_size + max(input_size, output_size)) * 2
                     else:
-                        workspace_size = (output_size + max(input_size, output_size)) * 2
-                else:
-                    if ALIGN4(L) * ALIGN4(M) <= 65536: 
-                        workspace_size = input_size * 2
+                        if ALIGN4(L) * ALIGN4(M) <= 65536: 
+                            workspace_size = input_size * 2
+                        else:
+                            workspace_size = (input_size + output_size) * 2
+                elif out.dtype == np.int32:  # int32 output
+                    if weight.dtype == np.int32:
+                        input_32_size = input_size * 4
+                        input_16_size = input_size * 2
+                    elif weight.dtype == np.int8:
+                        input_32_size = input_size
+                        input_16_size = 0
                     else:
-                        workspace_size = (input_size + output_size) * 2
-            elif out.dtype == np.int32:  # int32 output
-                # Distinguish by input dtype
-                if data.dtype == np.int32:  # Int32 input + Int32 weight + Int32 output
+                        raise ValueError(f"Unsupported weight.dtype: {weight.dtype}\n")
+
+                    if out.mem_type != MemType.SHARE_MEM:
+                        if ALIGN2(L) * ALIGN4(M) <= 32768:
+                            workspace_size = input_32_size + max(output_size * 4 , input_16_size)
+                        else:
+                            workspace_size = max(input_32_size, output_size * 4) + max(output_size * 4, input_16_size)
+                    else:
+                        if ALIGN2(L) * ALIGN4(M) <= 32768:
+                            workspace_size = input_32_size
+                        else:
+                            workspace_size = input_32_size +  max(output_size * 4, input_16_size)
+            elif data.dtype == np.int32:
+                if out.dtype == np.int8:  # int32 output
+                    #计算weight从int8到int32的workspace
+                    if weight.dtype == np.int8:
+                        weight_input_size = weight_size * 6
+                    else:
+                        weight_input_size = 0
+                    
+                    if out.mem_type != MemType.SHARE_MEM:  # output in PSRAM (y_in_psram=1)
+                        if ALIGN2(L) * ALIGN4(M) <= 65536:
+                            workspace_size = input_size * 4 + output_size + weight_input_size
+                        else:
+                            workspace_size = max(input_size * 4, output_size) + output_size + weight_input_size
+                    else:  # output in ShareRAM (y_in_psram=0)
+                        if ALIGN2(L) * ALIGN4(M) <= 65536:
+                            workspace_size = input_size * 4 + weight_input_size
+                        else:
+                            workspace_size = input_size * 4 + output_size + weight_input_size
+                elif out.dtype == np.int32:  # int32 output
                     if out.mem_type != MemType.SHARE_MEM:  # output in PSRAM (y_in_psram=1)
                         if ALIGN2(L) * ALIGN4(M) <= 32768:
                             workspace_size = input_size * 4 + output_size * 4
@@ -178,17 +222,6 @@ class LinearInt(Operator):
                             workspace_size = input_size * 4
                         else:
                             workspace_size = input_size * 4 + output_size * 4
-                else:  # Int8 input + Int8 weight + Int32 output
-                    if out.mem_type != MemType.SHARE_MEM:  # output in PSRAM (y_in_psram=1)
-                        if ALIGN2(L) * ALIGN4(M) <= 32768:
-                            workspace_size = input_size + output_size * 4
-                        else:
-                            workspace_size = max(input_size, output_size * 4) + output_size * 4
-                    else:  # output in ShareRAM (y_in_psram=0)
-                        if ALIGN2(L) * ALIGN4(M) <= 32768:
-                            workspace_size = input_size
-                        else:
-                            workspace_size = input_size + output_size * 4
         elif platform == "venus":
             if len(self.inputs) > 2:
                 workspace_size = out.nbytes * self.inputs[2].dtype.itemsize

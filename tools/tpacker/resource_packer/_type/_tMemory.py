@@ -44,7 +44,7 @@ class tMemoryList(object):
             if i == 2:
                 assert _total_size <= ramsize, f"{Colors.RED}  SHARE-MEM to be allocated was {_total_size}, exceed {ramsize} Byte{Colors.RESET}"
             elif i == 1:
-                assert _total_size <= 8 * 1024 * 1024, f"{Colors.RED}  SPSRAM to be allocated was {_total_size}, exceed 8MB{Colors.RESET}"
+                assert _total_size <= 8 * 1024 * 1024, f"{Colors.RED}  PSRAM to be allocated was {_total_size}, exceed 8MB{Colors.RESET}"
 
         self.obj = tffi.new("tMemoryList *")
 

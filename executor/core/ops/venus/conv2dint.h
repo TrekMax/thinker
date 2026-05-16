@@ -319,7 +319,7 @@ static int32_t conv2dint_i16w16o8(int16_t *input, int16_t *weight, int32_t *bias
   int32_t cstep_size = conv_attrs->output_h * conv_attrs->output_w;
   int32_t channel_col = conv_attrs->input_c * conv_attrs->weight_h * conv_attrs->weight_w;
   int32_t total_size = c_out * cstep_size;
-  int32_t *conv_out = (int32_t *)(temp + cstep_size * channel_col);
+  int32_t *conv_out = (int32_t *)(temp + cstep_size * channel_col * sizeof(int16_t));
   // dumpInt16("conv0_ori.txt", input, 40, 10);
 
 	img2col_cpu_align_int16_hpad((int16_t *)input, conv_attrs, (int16_t *)temp);

@@ -1,3 +1,5 @@
+import numpy as np
+
 from ...xsympy import is_sympy
 from .base import Operator, OperatorAttrs, register_op
 
@@ -13,6 +15,11 @@ class Tile(Operator):
         assert len(inputs) == 2, "Tile operation requires exactly two inputs"
         X = inputs[0]
         repeats = inputs[1].data
+        platform = self.attrs.get("platform", "venus")
+        if platform == "venus":
+            assert X.dtype in (np.int8, np.float32), "Tile on venus only supports int8 or float32 input"
+            assert inputs[1].dtype == np.int64, "Tile on venus requires int64 repeats"
+            assert len(X.shape) == inputs[1].shape[0], "Tile repeat length must equal input rank"
 
         # Calculate output shape by tiling input shape
         yshape = X.shape * repeats

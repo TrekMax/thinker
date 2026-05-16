@@ -125,7 +125,7 @@ static int32_t shfit_floor_x05_int32(int32_t x, int32_t shift) {
  */
 static const int16_t calc_sqrt_reciprocal(const int64_t data, int32_t q_x, int32_t *table_shift)
 {
-	const int q_normal = 10;	//normalize(-32, 32)
+	const int q_normal = 15;	//normalize(-32, 32)
 	const int q2 = 14;
 	int64_t temp;
 	int q1;
@@ -299,7 +299,7 @@ int32_t layernormalint_venus(const tTensor *X, const tTensor *W, const tTensor *
     int8_t *p_dst       = (int8_t *)Y->dptr_;
     int8_t *p_tmp       = (int8_t *)workspace->dptr_;
 
-	int32_t q_normal    = 10;
+	int32_t q_normal    = 15;
 	int32_t q_x         = (int32_t)X->scale_;
 	int32_t q_gamma     = (int32_t)W->scale_;
 	int32_t q_beta      = (int32_t)Bias->scale_;
@@ -312,9 +312,9 @@ int32_t layernormalint_venus(const tTensor *X, const tTensor *W, const tTensor *
     int16_t *p_numerator_int16 = (int16_t *)p_tmp;
 	int32_t *p_numerator= (int32_t *)(p_tmp + ALIGN2(T) * sizeof(int16_t)); // T * sizeof(int32_t)
 
-	int32_t *p_y1       = (int32_t *)p_tmp;
-    int16_t *p_weight_int16 = (int16_t *)(p_tmp + T * sizeof(int32_t)); // T * sizeof(int32_t)
-    int32_t *p_weight   = (int32_t *)(p_tmp + T * sizeof(int32_t) + ALIGN2(T) * sizeof(int16_t)); // T * sizeof(int32_t)
+    int16_t *p_weight_int16 = (int16_t *)p_tmp; // T * sizeof(int32_t)
+    int32_t *p_weight   = (int32_t *)(p_tmp + ALIGN2(T) * sizeof(int16_t)); // T * sizeof(int32_t)
+	int32_t *p_y1       = (int32_t *)(p_tmp  + T * sizeof(int32_t) + ALIGN2(T) * sizeof(int16_t));
 
 	int32_t *p_y2       = p_y1;
 
@@ -355,7 +355,7 @@ int32_t layernormalint_venus(const tTensor *X, const tTensor *W, const tTensor *
         THINKER_RET_CHECK(API_LIB(mul_i32i32o32)(p_y1, p_weight, p_y2, T, 0), "luna_mul_i32i32o32");
         int32_t *p_bias = (int32_t *)p_beta;
         if (2 != W->mem_.type_){
-            p_bias = (int32_t *)(p_tmp + T * sizeof(int32_t));
+            p_bias = (int32_t *)p_tmp;
             THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)p_bias, (int8_t *)p_beta, T * sizeof(int32_t)), "luna_memcpy_i8o8");
         }
 

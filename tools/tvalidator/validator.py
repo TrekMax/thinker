@@ -11,7 +11,33 @@ from .thinker_runner import ThinkerRunner
 from linger.checker import OnnxRunner
 import shutil
 import argparse
+import re
+import torch
 
+def _remove_if_exists(path: Path):
+        if path.exists():
+            if path.is_dir():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
+
+def _move_dump_dir(src: Path, dst: Path):
+    if not src.exists():
+        raise FileNotFoundError(f"Expected dump directory does not exist: {src}")
+
+    _remove_if_exists(dst)
+
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(src), str(dst))
+
+def _safe_filename(name: str) -> str:
+    """
+    Convert ONNX input name to a safe filename.
+    For example:
+        "input.1"      -> "input.1"
+        "images/input" -> "images_input"
+    """
+    return re.sub(r'[\\/:*?"<>|\s]+', "_", name)
 
 class Validator:
     def __init__(self, model, linger_dir:str, thinker_dir:str, tensor_shapes:Dict):
@@ -235,6 +261,11 @@ class ThinkerValidator:
         """
         self.lib_path = lib_path
         self.onnx_path = onnx_path
+        self.onnx_name = Path(onnx_path).stem
+
+        self.workspace_dir = Path.cwd() / "workspace" / self.onnx_name
+        self.workspace_dir.mkdir(parents=True, exist_ok=True)
+
         self.model_resource_path = model_resource_path
         self.platform = None
         self.dynamic_shape = False
@@ -254,10 +285,33 @@ class ThinkerValidator:
     def _generate_input(self):
         input_data_dict = self.onnx_model.generate_input()
         linger_input, thinker_input = [], []
+
+        save_dir = Path.cwd() / "workspace" / self.onnx_name
+
         for input in self.onnx_model.graph_input:
             li, ti = input_data_dict[input.name]
             linger_input.append(li)
             thinker_input.append(ti)
+
+            safe_name = _safe_filename(input.name)
+
+            linger_input_int_path = save_dir / f"{safe_name}_linger_int.npy"
+            linger_input_float_path = save_dir / f"{safe_name}_linger_float.npy"
+            thinker_input_path = save_dir / f"{safe_name}_thinker.bin"
+
+            if isinstance(li, torch.Tensor):
+                li_np = li.detach().cpu().numpy()
+            else:
+                li_np = np.asarray(li)
+                
+            if isinstance(ti, torch.Tensor):
+                ti_np = ti.detach().cpu().numpy()
+            else:
+                ti_np = np.asarray(ti)
+
+            np.save(linger_input_float_path, li_np)
+            np.save(linger_input_int_path, ti_np)
+            ti_np.tofile(thinker_input_path)
 
         return linger_input, thinker_input
 
@@ -330,7 +384,7 @@ class ThinkerValidator:
         print(f"1️⃣ {Colors.BLUE} Starting generate inputs for linger and thinker.{Colors.RESET}")
         linger_input, thinker_input = self._generate_input()
         print(f"✅{Colors.GREEN} All inputs have been generated successfuly.{Colors.RESET}")
-
+        
         print(f"2️⃣ {Colors.BLUE} Linger onnxrunner inference start.{Colors.RESET}")
         self.run_linger_inference(linger_input)
         print(f"✅{Colors.GREEN} Linger onnxrunner inference succeed.{Colors.RESET}")
@@ -339,8 +393,21 @@ class ThinkerValidator:
         self.run_thinker_inference(thinker_input)
         print(f"✅{Colors.GREEN} ThinkerRunner inference succeed.{Colors.RESET}")
 
+        cwd = Path.cwd()
+
+        fixed_linger_dump_dir = cwd / "data" / "onnxrunner_int"
+        fixed_thinker_dump_dir = cwd / "workspace" / "data"
+
+        target_base_dir = cwd / "workspace" / self.onnx_name
+        target_linger_dump_dir = target_base_dir / "dump_linger"
+        target_thinker_dump_dir = target_base_dir / "dump_thinker"
+
+        _move_dump_dir(fixed_linger_dump_dir, target_linger_dump_dir)
+        _move_dump_dir(fixed_thinker_dump_dir, target_thinker_dump_dir)
+
         print(f"4️⃣ {Colors.BLUE} Consistency verification start.{Colors.RESET}")
-        validator = Validator(self.onnx_model.model, "data/onnxrunner_int", "workspace/data", self.tensor_shapes)
+
+        validator = Validator(self.onnx_model.model, str(target_linger_dump_dir), str(target_thinker_dump_dir), self.tensor_shapes)
         validator.compare()
 
 def parse_dynamic_cfg(cfg_input) -> Dict:

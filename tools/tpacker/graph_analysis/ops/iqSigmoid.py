@@ -49,15 +49,14 @@ class iqSigmoid(Operator):
         Y = self.outputs[0]
         data_size = np.prod(X.shape)
         platform = self.attrs.get("platform", "venus")
+        # assert Y.mem_type == MemType.SHARE_MEM, "output mem_type of iqSigmoid must be share memory"
 
         workspace_size = 0
         if platform == "venus":
             assert X.mem_type == MemType.SHARE_MEM, "input mem_type of iqSigmoid must be share memory"
-            assert Y.mem_type == MemType.SHARE_MEM, "output mem_type of iqSigmoid must be share memory"
             workspace_size = data_size * 2 if X.scale != 11 else 0
         elif platform == "arcs":
             assert X.mem_type == MemType.SHARE_MEM, "input mem_type of iqSigmoid must be share memory"
-            assert Y.mem_type == MemType.SHARE_MEM, "output mem_type of iqSigmoid must be share memory"
             workspace_size = data_size * 4
         elif platform == "venusA":
             if X.dtype == np.int8:

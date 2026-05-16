@@ -141,6 +141,7 @@ class ONNXModel:
         graph = model.graph
 
         consumer_map: Dict[str, List[Tuple[onnx.NodeProto, int]]] = {i.name: [] for i in self.graph_input}
+        inits_map = {i.name: numpy_helper.to_array(i) for i in graph.initializer}
         for initializer in graph.initializer: consumer_map[initializer.name] = []
         for node in graph.node:
             for i, inp in enumerate(node.input):
@@ -158,12 +159,11 @@ class ONNXModel:
 
             queue = deque([(graph_input.name, graph_input.name)])
             visited_tensors = {graph_input.name}
-            
             input_ready = False
             while queue and not input_ready: 
                 current_tensor, original_source = queue.popleft()
                 consumers = consumer_map.get(current_tensor, [])
-
+                
                 for consumer_node, consumer_index in consumers:
                     if consumer_node.op_type in self.__quant_op_configs:
                         print(f"    -> Path reached potential target '{consumer_node.name}' at its input index {consumer_index}.")
@@ -223,6 +223,23 @@ class ONNXModel:
                             input_ready = True
                             break # Break from consumers loop, this path is done
                     elif consumer_node.op_type in TRANSPARENT_OPS:
+                        if consumer_node.op_type == "Gather" and consumer_index==1: ##输入是indices，原生就为定点值，非量化数据
+                            # input do not need to be quantized
+                            if self.inputs is not None:
+                                print(f"    -> ACTION: use provided input <{original_source}>, shape is {self.input_info[original_source].shape}.")
+                                thinker_input = self.inputs[i]
+                            else:
+                                print(f"    -> ACTION: generate normal input <{original_source}>, shape is {self.input_info[original_source].shape}.")
+                                min_val = 0
+                                max_val = inits_map[consumer_node.input[0]].shape[0]
+                                thinker_input = np.random.randint(min_val, max_val, size=self.input_info[original_source].shape, dtype=self.input_info[original_source].dtype)
+                            onnxrunner_input = torch.from_numpy(thinker_input).cpu()
+                            inputs_dict[original_source] = (onnxrunner_input, thinker_input)
+                            print(f"    -> SUCCESS: normal input <{original_source}> generated.")
+
+                            processed_graph_inputs.add(original_source)
+                            input_ready = True
+                            break
                         for output_tensor in consumer_node.output:
                             if output_tensor not in visited_tensors:
                                 print(f"    -> Traversing through transparent op '{consumer_node.name}'...")
@@ -293,6 +310,18 @@ class ONNXModel:
                 ]
             },
             'GRUInt': {
+                'quantizable_inputs': [
+                    {'name': 'sequence_input', 
+                     'locator_logic': {'type': 'static', 'index': 0}, 
+                     'scale_attr': 'scale_x', 
+                     'zp_attr': 'x_zero_point'},
+                    {'name': 'initial_hidden', 
+                     'locator_logic': {'type': 'conditional', 'arg': 'num_inputs', 'cases': [{'if_equal': 7, 'index': 1}, {'if_equal': 8, 'index': 2}]}, 
+                     'scale_attr': 'scale_h', 
+                     'zp_attr': 'h_zero_point'},
+                ]
+            },
+            'QGRU': {
                 'quantizable_inputs': [
                     {'name': 'sequence_input', 
                      'locator_logic': {'type': 'static', 'index': 0}, 
@@ -424,7 +453,7 @@ class ONNXModel:
                 'quantizable_inputs': [
                     {'name': 'sequence_input', 
                      'locator_logic': {'type': 'static', 'index': 0}, 
-                     'scale_attr': 'scale_i', 
+                     'scale_attr': 'scale_x', 
                      'zp_attr': 'i_zero_point'},
                     {'name': 'initial_hidden', 
                      'locator_logic': {'type': 'conditional', 'arg': 'num_inputs', 'cases': [{'if_equal': 7, 'index': 1}, {'if_equal': 8, 'index': 2}]}, 

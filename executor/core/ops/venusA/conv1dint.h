@@ -1,5 +1,5 @@
-#ifndef _CONV1DINT_ARCS_H_
-#define _CONV1DINT_ARCS_H_
+#ifndef _CONV1DINT_VENUSA_H_
+#define _CONV1DINT_VENUSA_H_
 
 #include <math.h>
 #include <stdint.h>
@@ -98,6 +98,23 @@ static void conv1dint_para_init(Conv1dIntAttrs *attrs, conv_struct_t *conv_attrs
  * @return int32_t Operation status
  */
 int32_t conv1dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y, tTensor *Temp, Conv1dIntAttrs *attrs) {   
+    (void)Temp;
+    if (X == NULL || W == NULL || Y == NULL || attrs == NULL) {
+        return T_ERR_INVALID_PARA;
+    }
+    if (X->dtype_ != Int8) {
+        return T_ERR_INVALID_DATATYPE;
+    }
+    if (W->dtype_ != Int4 && W->dtype_ != Int8) {
+        return T_ERR_INVALID_DATATYPE;
+    }
+    if (Y->dtype_ != Int8 && Y->dtype_ != Int16 && Y->dtype_ != Int32) {
+        return T_ERR_INVALID_DATATYPE;
+    }
+    if (Bias != NULL && Bias->dtype_ != Int32) {
+        return T_ERR_INVALID_DATATYPE;
+    }
+
     // Data pointers
     int8_t *src = (int8_t *)(X->dptr_);
     int8_t *weight = (int8_t *)(W->dptr_);
@@ -113,6 +130,9 @@ int32_t conv1dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y, tTenso
     int32_t q_w = (int32_t)W->scale_;
     int32_t q_y = (int32_t)Y->scale_;
     int32_t shift = (q_x + q_w - q_y < 0) ? (q_y - q_x - q_w) : 0;
+    if (shift != 0 && Y->dtype_ != Int32) {
+        return T_ERR_INVALID_PARA;
+    }
     
     // Dimension parameters
     uint32_t input_c = conv_attrs.input_c;
@@ -121,8 +141,11 @@ int32_t conv1dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y, tTenso
     int32_t kernel = attrs->kernel;
     
     // Check kernel size
-    if (kernel > 12) {
+    if (kernel <= 0 || kernel > 12) {
         THINKER_LOG_FATAL("conv1d does not support kernel size > 12");
+        return T_ERR_INVALID_PARA;
+    }
+    if (attrs->stride == 0 || group <= 0) {
         return T_ERR_INVALID_PARA;
     }
     
@@ -136,6 +159,13 @@ int32_t conv1dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y, tTenso
                 THINKER_RET_CHECK(API_LIB(conv1d_i8i4o8)(src, weight, bias, dst, &conv_static_para), "luna_conv1d_i8i4o8");
             } else if (W->dtype_ == Int8) {
                 THINKER_RET_CHECK(API_LIB(conv1d_i8i8o8)(src, weight, bias, dst, &conv_static_para), "luna_conv1d_i8i8o8");
+            }
+        } else if (Y->dtype_ == Int16) {
+            int16_t *dst = (int16_t *)(Y->dptr_);
+            if (W->dtype_ == Int4) {
+                THINKER_RET_CHECK(API_LIB(conv1d_i8i4o16)(src, weight, bias, dst, &conv_static_para), "luna_conv1d_i8i4o16");
+            } else if (W->dtype_ == Int8) {
+                THINKER_RET_CHECK(API_LIB(conv1d_i8i8o16)(src, weight, bias, dst, &conv_static_para), "luna_conv1d_i8i8o16");
             }
         } else if (Y->dtype_ == Int32) {
             int32_t *dst = (int32_t *)(Y->dptr_);
@@ -159,6 +189,13 @@ int32_t conv1dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y, tTenso
             } else if (W->dtype_ == Int8) {
                 THINKER_RET_CHECK(API_LIB(depthwise1d_i8i8o8)(src, weight, bias, dst, &conv_static_para), "luna_depthwise1d_i8i8o8");
             }
+        } else if (Y->dtype_ == Int16) {
+            int16_t *dst = (int16_t *)(Y->dptr_);
+            if (W->dtype_ == Int4) {
+                THINKER_RET_CHECK(API_LIB(depthwise1d_i8i4o16)(src, weight, bias, dst, &conv_static_para), "luna_depthwise1d_i8i4o16");
+            } else if (W->dtype_ == Int8) {
+                THINKER_RET_CHECK(API_LIB(depthwise1d_i8i8o16)(src, weight, bias, dst, &conv_static_para), "luna_depthwise1d_i8i8o16");
+            }
         } else if (Y->dtype_ == Int32) {
             int32_t *dst = (int32_t *)(Y->dptr_);
             int32_t size = getShapeSize(&(Y->shape_));
@@ -179,4 +216,4 @@ int32_t conv1dint_luna(tTensor *X, tTensor *W, tTensor *Bias, tTensor *Y, tTenso
     return T_SUCCESS;
 }
 
-#endif  //_CONV1DINT_ARCS_H_
+#endif  //_CONV1DINT_VENUSA_H_

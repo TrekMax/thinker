@@ -19,13 +19,17 @@ class Conv2dIntAttrs(OperatorAttrs):
         """Check and validate the parameters for Conv2dInt operation."""
         platform = self.attrs.get("platform", "venus")
         if platform in {"arcs", "venusA"}:
-            quant_type = RoundMethod.from_str(self.attrs.get("quant_mode"))
+            assert "quant_mode" in self.attrs, "Missing required attribute: quant_mode"
         else:
             if "quant_mode" in self.attrs:
-                quant_type = QuantType.from_str(self.attrs.get("quant_mode"))
+                quant_mode = self.attrs.get("quant_mode")
+                if quant_mode == "luna_quant":
+                    quant_mode = "FLOOR_ADD"
             else:
-                quant_type = QuantType.from_str(self.attrs.get("platform_quant"))
-        self.attrs["quant_type"] = quant_type
+                quant_mode = self.attrs.get("platform_quant")
+                if quant_mode == "luna_quant":
+                    quant_mode = "FLOOR_ADD"
+            self.attrs['quant_mode'] = quant_mode
 
         # Check required attributes
         required_attrs = [
@@ -92,7 +96,7 @@ class Conv2dIntAttrs(OperatorAttrs):
         attrs.pad = self.attrs["pads"]
         attrs.stride = self.attrs["strides"]
         attrs.group = self.attrs["group"]
-        attrs.quant_type = self.attrs["quant_type"].value
+        attrs.quant_type = RoundMethod.from_str(self.attrs["quant_mode"]).value
         attrs.act_type = self.attrs.get("act_type", 0)
         return bytes(tffi.buffer(attrs))
 

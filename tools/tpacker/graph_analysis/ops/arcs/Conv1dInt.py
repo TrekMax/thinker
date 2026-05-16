@@ -88,6 +88,7 @@ def Conv1dInt_weight_rearrange(
 
                 new_weight_data = new_weight_data.reshape(-1, 8, 1, kernel_h)
                 new_weight_data = new_weight_data.transpose(0, 2, 3, 1)
+                new_weight.data = new_weight_data
                 new_weight.shape = new_weight_data.shape
                 new_weight.layout = Layout.NHWC8
 

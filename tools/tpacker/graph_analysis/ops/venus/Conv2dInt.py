@@ -77,8 +77,8 @@ def get_Conv2dInt_workspace(
                         split_h     = (h_ou * stride_h) // split_num + kernel_h - stride_h
                         if split_num > h_in or split_num > h_ou:
                             break
-                    if h_in * w_in >= 65536:
-                        workspace_size = max(c_in * split_h * w_in, c_ou * h_ou * w_ou * out.dtype.itemsize)
+                    # if h_in * w_in >= 65536:
+                    workspace_size = max(c_in * split_h * w_in, c_ou * h_ou//split_num * w_ou * out.dtype.itemsize)
                 else:
                     pass
             elif group == c_ou:

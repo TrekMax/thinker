@@ -26,6 +26,7 @@
  * @return int32_t Operation status
  */
 int32_t linearint_luna(tTensor *input, tTensor *weight, tTensor *bias, LinearIntAttrs *attrs, tTensor *workspace, tTensor *output) {
+
     tShape new_shape;
 
     // Reshape input tensor for 2D processing
@@ -41,13 +42,14 @@ int32_t linearint_luna(tTensor *input, tTensor *weight, tTensor *bias, LinearInt
         new_shape = input->shape_;
     }
 
+
     // Check if input and output are in PSram
     int32_t x_in_psram = (input->mem_.type_ != 2);
     int32_t y_in_psram = (output->mem_.type_ != 2);
 
 #ifdef RUNTIME_PARAM_CHECK
-    if (!((input->dtype_ == Int8  && weight->dtype_ == Int8)  ||
-        (input->dtype_ == Int32 && weight->dtype_ == Int32))) {
+    if (!((input->dtype_ == Int8  && (weight->dtype_ == Int32 || weight->dtype_ == Int8))  ||
+        (input->dtype_ == Int32 && (weight->dtype_ == Int32 || weight->dtype_ == Int8)))) {
         return T_ERR_INVALID_DATATYPE;
     }
 #endif
@@ -64,7 +66,7 @@ int32_t linearint_luna(tTensor *input, tTensor *weight, tTensor *bias, LinearInt
     int32_t L = weight->shape_.dims_[0];
     int32_t input_num =  M * N;
     int32_t output_num = M * L;
-
+    int32_t weight_size = L * N;
     // Validate weight dimensions
     if (weight->shape_.dims_[n_dim - 1] != new_shape.dims_[n_dim - 1]) {
         return T_ERR_INVALID_DATATYPE;
@@ -101,48 +103,33 @@ int32_t linearint_luna(tTensor *input, tTensor *weight, tTensor *bias, LinearInt
         // Handle Int8 input transpose
         if (x_in_psram == 1) {
             int8_t *src_tmp = p_tmp + offset;
-            THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(src, src_tmp, M * N), "luna_memcpy_i8o8");
-            THINKER_RET_CHECK(API_LIB(split_mat_trans_i8o8)(src_tmp, p_src, M, N), "luna_split_mat_trans_i8o8");
+            THINKER_RET_CHECK(API_LIB(memcpy_i8o8)(src_tmp, src, M * N), "luna_memcpy_i8o8");
+            src = src_tmp;
         }
-        else {
-            if (ALIGN4(M) * ALIGN8(N) <= 65536) {
-                THINKER_RET_CHECK(API_LIB(mat_trans_i8o8)(src, p_src, M, N), "luna_mat_trans_i8o8");
-            }else{
-                THINKER_RET_CHECK(API_LIB(split_mat_trans_i8o8)(src, p_src, M, N), "luna_split_mat_trans_i8o8");
-            }
+        if (ALIGN4(M) * ALIGN8(N) <= 65536) {
+            THINKER_RET_CHECK(API_LIB(mat_trans_i8o8)(src, p_src, M, N), "luna_mat_trans_i8o8");
+        }
+        else{
+            THINKER_RET_CHECK(API_LIB(split_mat_trans_i8o8)(src, p_src, M, N), "luna_split_mat_trans_i8o8");
         }
 
         if ((weight->dtype_ == Int4 || weight->dtype_ == Int8)  && output->dtype_ == Int8) {
             if (y_in_psram) {
                 int8_t *dst_tmp = p_tmp + input_size;
-                if (ALIGN4(L) * ALIGN8(M) > 65536) {
-                    dst_tmp = p_tmp + MAX(input_size, output_size);
-                }
                 if (weight->dtype_ == Int4)
                     THINKER_RET_CHECK(API_LIB(split_mat_mul_bias_i4i8i32o8)(p_weight, p_src, p_bias, dst_tmp, L, ALIGN2(N), M, shift), "luna_split_mat_mul_bias_i4i8i32o8");
                 else
                     THINKER_RET_CHECK(API_LIB(split_mat_mul_bias_i8i8i32o8)(p_weight, p_src, p_bias, dst_tmp, L, N, M, shift), "luna_split_mat_mul_bias_i8i8i32o8");
-                if (ALIGN4(L) * ALIGN8(M) <= 65536) {
 
-#ifdef RUNTIME_PARAM_CHECK
-                    if (workspace_size < input_size + output_size) {
-                        return T_ERR_NO_WORKSPACE;
-                    }
-#endif
+                if (ALIGN4(L) * ALIGN8(M) <= 65536) {
                     THINKER_RET_CHECK(API_LIB(mat_trans_i8o8)(dst_tmp, dst_tmp, L, M), "luna_mat_trans_i8o8");
-                    opi_psram_cpy_out((void *)output->dptr_, dst_tmp, output_size);
                 }
                 else {
-
-#ifdef RUNTIME_PARAM_CHECK
-                    if (workspace_size < (output_size + MAX(input_size, output_size))) {
-                        return T_ERR_NO_WORKSPACE;
-                    }
-#endif
                     int8_t *dst_tmp1 = p_tmp;
                     THINKER_RET_CHECK(API_LIB(split_mat_trans_i8o8)(dst_tmp, dst_tmp1, L, M), "luna_split_mat_trans_i8o8");
-                    opi_psram_cpy_out((void *)output->dptr_, dst_tmp1, output_size);
+                    dst_tmp = dst_tmp1;
                 }
+                opi_psram_cpy_out((void *)output->dptr_, dst_tmp, output_size);
             }
             else {
                 int8_t *dst_tmp = (int8_t *)output->dptr_;
@@ -155,19 +142,9 @@ int32_t linearint_luna(tTensor *input, tTensor *weight, tTensor *bias, LinearInt
                     THINKER_RET_CHECK(API_LIB(split_mat_mul_bias_i8i8i32o8)(p_weight, p_src, p_bias, dst_tmp, L, N, M, shift), "luna_split_mat_mul_bias_i8i8i32o8");
 
                 if (ALIGN4(L) * ALIGN8(M) <= 65536) {
-#ifdef RUNTIME_PARAM_CHECK
-                    if (workspace_size < input_size) {
-                        return T_ERR_NO_WORKSPACE;
-                    }
-#endif
                     THINKER_RET_CHECK(API_LIB(mat_trans_i8o8)((int8_t *)dst_tmp, (int8_t *)output->dptr_, L, M), "luna_mat_trans_i8o8");
                 } 
                 else {
-#ifdef RUNTIME_PARAM_CHECK
-                    if (workspace_size < (input_size + output_size)) {
-                        return T_ERR_NO_WORKSPACE;
-                    }
-#endif
                     THINKER_RET_CHECK(API_LIB(split_mat_trans_i8o8)(dst_tmp, (int8_t *)output->dptr_, L, M), "luna_split_mat_trans_i8o8");
                 }
             }
@@ -306,6 +283,65 @@ int32_t linearint_luna(tTensor *input, tTensor *weight, tTensor *bias, LinearInt
                 }
             }
         }
+        else if (weight->dtype_ == Int32 && output->dtype_ == Int32){
+            int32_t *p_32_weight = (int32_t *)p_weight;
+            int32_t *p_src_i32 = (int32_t *)p_src;
+            int16_t *p_src_i16 = (int16_t *)(p_src + input_num * 4);
+            THINKER_RET_CHECK(API_LIB(scale_i8i8o16)(p_src, 1, p_src_i16, input_num, 0), "luna_scale_i8i8o16");
+            THINKER_RET_CHECK(API_LIB(scale_i16i16o32)(p_src_i16, 1L, p_src_i32, input_num, 0), "luna_scale_i16i16o32");
+            int32_t input_32_size = input_num * 4;
+
+            if (y_in_psram) {
+                int32_t *dst_tmp = (int32_t *)(p_tmp + input_32_size);
+                if (ALIGN4(L) * ALIGN8(M) > 32768) {
+                    dst_tmp =(int32_t *)(p_tmp + MAX(input_32_size, output_size));
+                }
+                THINKER_RET_CHECK(API_LIB(split_mat_mul_bias_i32i32i32o32)((int32_t *)p_32_weight, (int32_t *)p_src_i32, p_bias, dst_tmp, L, N, M, shift), "luna_split_mat_mul_bias_i32i32i32o32");
+
+                if (ALIGN4(L) * ALIGN8(M) <= 32768) {
+#ifdef RUNTIME_PARAM_CHECK
+                    if (workspace_size < (input_32_size +  MAX(output_size, input_num * 2))) {
+                        return T_ERR_NO_WORKSPACE;
+                    }
+#endif
+                    THINKER_RET_CHECK(API_LIB(mat_trans_i32o32)(dst_tmp, dst_tmp, L, M), "luna_mat_trans_i32o32");
+                    opi_psram_cpy_out((void *)output->dptr_, dst_tmp, output_size);
+                }
+                else {
+#ifdef RUNTIME_PARAM_CHECK
+                    if (workspace_size < (MAX(input_32_size, output_size)  + MAX(output_size, input_num * 2))) {
+                        return T_ERR_NO_WORKSPACE;
+                    }
+#endif
+                    int32_t *dst_tmp1 = (int32_t *)p_tmp;
+                    THINKER_RET_CHECK(API_LIB(split_mat_trans_i32o32)(dst_tmp, dst_tmp1, L, M), "luna_split_mat_trans_i32o32");
+                    opi_psram_cpy_out((void *)output->dptr_, dst_tmp1, output_size);
+                }
+            }
+            else {
+                int32_t *dst_tmp = (int32_t *)output->dptr_;
+                if (ALIGN4(L) * ALIGN8(M) > 32768) {
+                    dst_tmp =(int32_t *)(p_tmp + input_32_size);
+                }
+                THINKER_RET_CHECK(API_LIB(split_mat_mul_bias_i32i32i32o32)((int32_t *)p_32_weight, (int32_t *)p_src_i32, p_bias, dst_tmp, L, N, M, shift), "luna_split_mat_mul_bias_i32i32i32o32");
+                if (ALIGN4(L) * ALIGN8(M) <= 32768) {
+#ifdef RUNTIME_PARAM_CHECK
+                    if (workspace_size < input_32_size) {  
+                        return T_ERR_NO_WORKSPACE;
+                    }
+#endif
+                    THINKER_RET_CHECK(API_LIB(mat_trans_i32o32)(dst_tmp, (int32_t *)output->dptr_, L, M), "luna_mat_trans_i32o32");
+                }
+                else {
+#ifdef RUNTIME_PARAM_CHECK
+                    if (workspace_size < (input_32_size + MAX(output_size, input_num * 2))) {
+                        return T_ERR_NO_WORKSPACE;
+                    }
+#endif
+                    THINKER_RET_CHECK(API_LIB(split_mat_trans_i32o32)(dst_tmp, (int32_t *)output->dptr_, L, M), "luna_split_mat_trans_i32o32");
+                }
+            }
+        }
         else{
             return T_ERR_INVALID_DATATYPE;
         }
@@ -313,7 +349,7 @@ int32_t linearint_luna(tTensor *input, tTensor *weight, tTensor *bias, LinearInt
     else if (input->dtype_ == Int32) {
         if (x_in_psram == 1) {
             int32_t *src_tmp = (int32_t *)(p_tmp + offset);
-            THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)src, (int8_t *)src_tmp, M * N *4), "luna_memcpy_i8o8");
+            THINKER_RET_CHECK(API_LIB(memcpy_i8o8)((int8_t *)src_tmp, (int8_t *)src, M * N *4), "luna_memcpy_i8o8");
             THINKER_RET_CHECK(API_LIB(split_mat_trans_i32o32)(src_tmp, (int32_t *)p_src, M, N), "luna_split_mat_trans_i32o32");
         }
         else {
@@ -387,6 +423,71 @@ int32_t linearint_luna(tTensor *input, tTensor *weight, tTensor *bias, LinearInt
                     }
 #endif   
                     THINKER_RET_CHECK(API_LIB(split_mat_trans_i32o32)(dst_tmp, (int32_t *)output->dptr_, L, M), "luna_split_mat_trans_i32o32");
+                }
+            }
+        }
+        else if ((weight->dtype_ == Int32 || weight->dtype_ == Int8) && output->dtype_ == Int8){
+            int32_t *p_weight_i32 = (int32_t *)p_weight;
+            int32_t weight_input_size = 0;
+            int32_t weight_sram_size = 0;
+            if (weight->dtype_ == Int8){
+                p_weight_i32 = (int32_t *)(p_tmp + input_size);
+                int16_t *p_weight_i16 = (int16_t *)(p_tmp + input_size + weight_size * 4);
+                THINKER_RET_CHECK(API_LIB(scale_i8i8o16)(p_weight, 1, p_weight_i16, weight_size, 0), "luna_scale_i8i8o16");
+                THINKER_RET_CHECK(API_LIB(scale_i16i16o32)(p_weight_i16, 1L, p_weight_i32, weight_size, 0), "luna_scale_i16i16o32");
+                weight_input_size = weight_size * 4;
+                weight_sram_size = weight_size * 6;
+            }
+            if (y_in_psram) {
+                int8_t *dst_tmp = p_tmp + input_size + weight_input_size;
+                if (ALIGN4(L) * ALIGN8(M) > 65536) {
+                    dst_tmp = p_tmp + MAX(input_size, output_size) + weight_input_size;
+                }
+                THINKER_RET_CHECK(API_LIB(split_mat_mul_bias_i32i32i32o8)((int32_t *)p_weight_i32, (int32_t *)p_src, p_bias, dst_tmp, L, N, M, shift), "luna_split_mat_mul_bias_i32i32i32o8");
+
+                if (ALIGN4(L) * ALIGN8(M) <= 65536) {
+#ifdef RUNTIME_PARAM_CHECK
+                    if (workspace_size < (input_size +  output_size + weight_sram_size)) {
+                        return T_ERR_NO_WORKSPACE;
+                    }
+#endif
+                    THINKER_RET_CHECK(API_LIB(mat_trans_i8o8)(dst_tmp, dst_tmp, L, M), "luna_mat_trans_i8o8");
+                    opi_psram_cpy_out((void *)output->dptr_, dst_tmp, output_size);
+                }
+                else {
+#ifdef RUNTIME_PARAM_CHECK
+                    if (workspace_size < (MAX(input_size, output_size)  + output_size + weight_sram_size)) {
+                        return T_ERR_NO_WORKSPACE;
+                    }
+#endif    
+                    int8_t *dst_tmp1 = p_tmp;
+                    THINKER_RET_CHECK(API_LIB(split_mat_trans_i8o8)(dst_tmp, dst_tmp1, L, M), "luna_split_mat_trans_i8o8");
+                    opi_psram_cpy_out((void *)output->dptr_, dst_tmp1, output_size);
+                }
+            }
+            else {
+                int8_t *dst_tmp = (int8_t *)output->dptr_;
+                if (ALIGN4(L) * ALIGN8(M) > 65536) {
+                    dst_tmp = p_tmp + input_size + weight_input_size;
+                }
+
+                THINKER_RET_CHECK(API_LIB(split_mat_mul_bias_i32i32i32o8)((int32_t *)p_weight_i32, (int32_t *)p_src, p_bias, dst_tmp, L, N, M, shift), "luna_split_mat_mul_bias_i32i32i32o8");
+
+                if (ALIGN4(L) * ALIGN8(M) <= 65536) {
+#ifdef RUNTIME_PARAM_CHECK
+                    if (workspace_size < input_size + weight_sram_size) {  
+                        return T_ERR_NO_WORKSPACE;
+                    }
+#endif
+                    THINKER_RET_CHECK(API_LIB(mat_trans_i8o8)(dst_tmp, (int8_t *)output->dptr_, L, M), "luna_mat_trans_i8o8");
+                }
+                else {
+#ifdef RUNTIME_PARAM_CHECK
+                    if (workspace_size < (input_size + output_size + weight_sram_size)) {
+                        return T_ERR_NO_WORKSPACE;
+                    }
+#endif
+                    THINKER_RET_CHECK(API_LIB(split_mat_trans_i8o8)(dst_tmp, (int8_t *)output->dptr_, L, M), "luna_split_mat_trans_i8o8");
                 }
             }
         }

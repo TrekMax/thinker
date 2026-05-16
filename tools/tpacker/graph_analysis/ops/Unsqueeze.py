@@ -6,13 +6,16 @@ from .base import Operator, OperatorAttrs, register_op
 class UnsqueezeAttrs(OperatorAttrs):
     def checkparams(self) -> None:
         """Validate and set default parameters for Unsqueeze operation."""
-        self.attrs["axes"] = self.attrs.get("axes", [])
-        assert len(self.attrs["axes"]) < 7, "axes length must be less than 7"
+        axes = self.attrs.get("axes", [])
+        if axes == {}:
+            assert len(inputs) == 2, "Unsqueeze operation requires exactly two inputs"
+            axes = inputs[1].data
+        assert len(axes) < 7, "axes length must be less than 7"
 
     def serialize(self) -> bytes:
         """Serialize Unsqueeze attributes to bytes."""
         attrs = tffi.new("SqueezeAttrs *")
-        attrs.axes = self.attrs["axes"]
+        attrs.axes = self.attrs.get("axes", [])
         return bytes(tffi.buffer(attrs))
 
 @register_op
@@ -24,11 +27,15 @@ class Unsqueeze(Operator):
     def infer_tensor(self, dynamic_shape):
         """Infer output tensor shape by adding dimensions at specified axes."""
         inputs = self.inputs
-        assert len(inputs) == 1, "Unsqueeze operation requires exactly one input"
         X = inputs[0]
 
         tShape = list(X.shape)
-        axes = list(self.attrs["axes"])
+        if len(inputs) == 1:
+            axes = list(self.attrs["axes"])
+        elif len(inputs) == 2:
+            axes = inputs[1].data
+        else:
+            raise ValueError("Unsqueeze operation requires exactly one or two inputs")
         rank = len(tShape) + len(axes)
 
         # Validate and adjust axes

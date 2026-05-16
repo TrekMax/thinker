@@ -13,20 +13,23 @@ class QuantAttrs(OperatorAttrs):
         assert "scale_x" in self.attrs and "data_bits" in self.attrs
         assert self.attrs['data_bits'] in (8, 16, 32), "Data bits must be 8, 16 or 32"
         platform = self.attrs.get("platform", "venus")
-        if platform in {"arcs", "venusA"}:
-            quant_type = QuantType.from_str(self.attrs.get("platform_quant", "qmax_quant"))
+        if "quant_mode" in self.attrs:
+            quant_mode = self.attrs.get("quant_mode")
+            if quant_mode == "luna_quant":
+                quant_mode = "FLOOR_ADD"
+        elif "platform_quant" in self.attrs:
+            quant_mode = self.attrs.get("platform_quant")
+            if quant_mode == "luna_quant":
+                quant_mode = "FLOOR_ADD"
         else:
-            if "quant_mode" in self.attrs:
-                quant_type = QuantType.from_str(self.attrs.get("quant_mode"))
-            else:
-                quant_type = QuantType.from_str(self.attrs.get("platform_quant"))
-        self.attrs["quant_mode"] = quant_type
+            quant_mode = "FLOOR_ADD"
+        self.attrs['quant_mode'] = quant_mode
 
     def serialize(self) -> bytes:
         """Serialize attributes to bytes"""
         attrs = tffi.new("QuantAttrs *")
         attrs.data_bits = self.attrs["data_bits"]
-        attrs.quant_type = self.attrs["quant_mode"].value
+        attrs.quant_type = RoundMethod.from_str(self.attrs["quant_mode"]).value
         return bytes(tffi.buffer(attrs))
 
 

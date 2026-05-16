@@ -42,6 +42,7 @@ class ArgMax(Operator, BaseLayout):
         axis = axis + ndims if axis < 0 else axis
         shape[axis] = 1
         shape[0] = 2
+        assert axis == ndims - 1, "Axis must be the last dimension"
 
         Y = Tensor.clone(inputs[0], shape=tuple(shape), dtype=np.int32, bits=4)
 

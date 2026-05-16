@@ -263,6 +263,7 @@ int32_t gruint_luna(tTensor *input, tTensor *history_h, tTensor *i2h_w, tTensor 
     if(params->layout != 0 && batch_size != 1) {
         //[T,F,B]=>[B,T,F]
         THINKER_RET_CHECK(API_LIB(mat_trans_i8o8)(p_out, p_out, seq_len * params->hidden_size, batch_size), "luna_mat_trans_i8o8");
+        THINKER_RET_CHECK(API_LIB(mat_trans_i8o8)(gru_param.p_h_in, (int8_t *)hidden_o->dptr_,params->hidden_size, batch_size), "luna_mat_trans_i8o8");
         //luna_memcpy_i8o8(p_input,p_tmp,batch_size * seq_len * params->input_size * sizeof(int8_t));
     }
     return T_SUCCESS;

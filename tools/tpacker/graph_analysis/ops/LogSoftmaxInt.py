@@ -42,6 +42,12 @@ class LogSoftmaxInt(iqUnaryOperator):
     def infer_tensor(self, dynamic_shape):
         """Infer the output tensor shape and properties based on input."""
         X = self.inputs[0]
+        platform = self.attrs.get("platform", "venus")
+        if platform == "venus":
+            axis = int(self.attrs["dim"])
+            assert -len(X.shape) <= axis < len(X.shape), "Axis out of bounds"
+            assert axis in (-1, 1), "LogSoftmaxInt on venus only supports dim=-1 or dim=1"
+            assert X.dtype == np.int8, "LogSoftmaxInt on venus only supports int8 input"
 
         # Process input scale
         scale_x = self.attrs["scale_x"]

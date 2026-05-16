@@ -18,7 +18,8 @@ VENUSA_CONFIGS = {
         "Split", "BatchNorm2dInt", "ReduceMean",
         "Requant", "LayerNormInt", "iqVar",
         "Cast", "Expand", "Tile", "topN", "topN2",
-        "Shape", "Packing", "GluInt", "Gelu",  "Swish"
+        "Shape", "Packing", "GluInt", "QGelu", "QSwish",
+        "BatchNorm1dInt"
     ],
     "supported_precision": ["INT8", "INT16", "INT32"]
 }

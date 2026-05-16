@@ -82,17 +82,15 @@ int32_t X(Forward)(tOperator* op, tTensor** tensors, int32_t num_tensor, tDMA_Li
         tTensor i2h_w_temp  = i2h_w[0];
         i2h_w_temp.dptr_    = (addr_type)(dma_temp->dptr_);
 
-        dma_temp  = ((tTensor**)tensors)[op->num_input_ + op->num_output_ + 2];
-        tTensor i2h_bias_temp = i2h_bias[0];
-        i2h_bias_temp.dptr_ = (addr_type)(dma_temp->dptr_);
-
-        dma_temp  = ((tTensor**)tensors)[op->num_input_ + op->num_output_ + 3];
         tTensor h2h_w_temp  = h2h_w[0];
-        h2h_w_temp.dptr_    = (addr_type)(dma_temp->dptr_);
+        h2h_w_temp.dptr_ = (addr_type)((int8_t *)i2h_w_temp.dptr_ + getShapeSize(&(i2h_w_temp.shape_)) * i2h_w_temp.byte_);
 
-        dma_temp  = ((tTensor**)tensors)[op->num_input_ + op->num_output_ + 4];
-        tTensor h2h_bias_temp     = h2h_bias[0];
-        h2h_bias_temp.dptr_ = (addr_type)(dma_temp->dptr_);
+        tTensor i2h_bias_temp = i2h_bias[0];
+        i2h_bias_temp.dptr_ = (addr_type)((int8_t *)h2h_w_temp.dptr_ + getShapeSize(&(h2h_w_temp.shape_)) * h2h_w_temp.byte_);
+
+        tTensor h2h_bias_temp = h2h_bias[0];
+        h2h_bias_temp.dptr_ = (addr_type)((int8_t *)i2h_bias_temp.dptr_ + getShapeSize(&(i2h_bias_temp.shape_)) * i2h_bias_temp.byte_);
+
 
         THINKER_RET_CHECK(gruint_luna(input, &hidden_i_inst, i2h_w, h2h_w, i2h_bias, h2h_bias,
                       output, hidden_o, attr, workspace), "gruint_luna");

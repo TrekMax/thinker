@@ -37,6 +37,12 @@ class topN2(Operator, BaseLayout):
         assert axis < ndims and axis >= -ndims, "axis out of bounds"
         axis = axis + ndims if axis < 0 else axis
 
+        platform = self.attrs.get("platform", "venus")
+        if platform == "venus":
+            assert inputs[0].dtype == np.int16, "topN2 on venus only supports int16 input"
+            assert N == 1, "topN2 on venus only supports max_num=1"
+            assert axis == ndims - 1, "topN2 on venus only supports the last axis"
+
         shape[axis] = N
         shape[0] = 2
 
@@ -46,7 +52,6 @@ class topN2(Operator, BaseLayout):
         assert abs(temp - int(temp)) < 0.000001, "scale_o must be a power of 2"
 
         # Create output tensor based on platform
-        platform = self.attrs.get("platform", "venus")
         if platform == "venus":
             Y = Tensor.clone(inputs[0], shape=tuple(shape), scale=int(temp), dtype=np.int16, bits=2)
         else:

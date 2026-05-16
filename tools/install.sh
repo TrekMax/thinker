@@ -1,6 +1,5 @@
-pip uninstall pythinker -y
+pip uninstall thinker -y
 rm -rf dist/*
-python setup.py sdist bdist_wheel
+python setup.py sdist
 
-python -m build
-pip install dist/pythinker*.whl
+pip install dist/thinker*.tar.gz

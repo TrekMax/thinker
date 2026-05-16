@@ -23,7 +23,7 @@ class GeluOperatorAttrs(OperatorAttrs):
 
 
 @register_op
-class Gelu(Operator):
+class QGelu(Operator):
     """Quantized Gaussian Error Linear Unit (GELU) activation function.
 
     GELU(x) = x * Φ(x) where Φ is the Gaussian CDF.
@@ -131,4 +131,4 @@ class Gelu(Operator):
         return flops
 
 
-__all__ = ["Gelu"]
+__all__ = ["QGelu"]

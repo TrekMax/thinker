@@ -35,10 +35,15 @@ class iqSum(iqBinaryOperator):
 
         # Ensure axis is within valid range
         assert -len(X.shape) <= axis < len(X.shape), "Axis out of bounds"
+        real_axis = axis + len(X.shape) if axis < 0 else axis
+        platform = self.attrs.get("platform", "venus")
+        if platform == "venus":
+            assert real_axis == len(X.shape) - 1, "iqSum on venus only supports the last axis"
+            assert X.dtype == np.int8, "iqSum on venus only supports int8 input"
 
         # Calculate output shape
         output_shape = list(X.shape)
-        output_shape[axis] = 1
+        output_shape[real_axis] = 1
 
         # Create output tensor
         Y = X.clone(shape=tuple(output_shape))
