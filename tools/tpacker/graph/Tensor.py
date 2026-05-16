@@ -38,7 +38,7 @@ class Tensor:
     @property
     def get_cstep(self):
         align_size = self.shape[2] * self.shape[3] * self.elemsize
-        return np.int((align_size + 15) // 16 * 16 / self.elemsize)
+        return int((align_size + 15) // 16 * 16 / self.elemsize)
 
     def has_data(self):
         return self.data is not None

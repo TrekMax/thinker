@@ -15,9 +15,16 @@ from onnx.helper import (
     make_model,
     make_tensor_value_info,
 )
-from onnx.mapping import NP_TYPE_TO_TENSOR_TYPE
 
 from .graph import Graph
+
+try:
+    from onnx.helper import np_dtype_to_tensor_dtype
+except ImportError:
+    from onnx.mapping import NP_TYPE_TO_TENSOR_TYPE
+
+    def np_dtype_to_tensor_dtype(dtype):
+        return NP_TYPE_TO_TENSOR_TYPE[np.dtype(dtype)]
 
 def _convert_dtype(dtype) -> int:
     """
@@ -33,10 +40,10 @@ def _convert_dtype(dtype) -> int:
         TypeError: 如果不支持该数据类型
     """
     np_dtype = np.dtype(dtype)
-    onnx_dtype = NP_TYPE_TO_TENSOR_TYPE.get(np_dtype)
-    if onnx_dtype is None:
-        raise TypeError(f"Unsupported dtype: {dtype}!")
-    return onnx_dtype
+    try:
+        return np_dtype_to_tensor_dtype(np_dtype)
+    except (KeyError, ValueError) as exc:
+        raise TypeError(f"Unsupported dtype: {dtype}!") from exc
 
 def _convert_shape(shape) -> list:
     """
@@ -195,7 +202,7 @@ def save_to_onnx_model(
         shape = _convert_shape(entry.tensor.shape)
         value_info = make_tensor_value_info(
             entry.name,
-            NP_TYPE_TO_TENSOR_TYPE[entry.tensor.dtype],
+            _convert_dtype(entry.tensor.dtype),
             shape,
         )
         onnx_model.graph.value_info.append(value_info)

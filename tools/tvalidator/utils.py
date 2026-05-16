@@ -1,5 +1,4 @@
 import onnx
-import onnx.mapping
 import numpy as np
 import torch
 from typing import Dict, List, Tuple
@@ -9,6 +8,14 @@ import math
 from dataclasses import dataclass
 from contextlib import contextmanager
 import os
+
+try:
+    from onnx.helper import tensor_dtype_to_np_dtype
+except ImportError:
+    from onnx import mapping
+
+    def tensor_dtype_to_np_dtype(tensor_dtype):
+        return mapping.TENSOR_TYPE_TO_NP_TYPE[tensor_dtype]
 
 class Colors:
     RESET = '\033[0m'
@@ -86,7 +93,7 @@ class ONNXModel:
         for i, vi in enumerate(graph_inputs):
             name = vi.name
             tensor_type = vi.type.tensor_type
-            dtype = onnx.mapping.TENSOR_TYPE_TO_NP_TYPE[tensor_type.elem_type]
+            dtype = np.dtype(tensor_dtype_to_np_dtype(tensor_type.elem_type))
             if self.inputs is not None:
                 shape = list(self.inputs[i].shape)
             else:

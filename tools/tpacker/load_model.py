@@ -7,11 +7,19 @@ import onnx
 import struct
 import numpy as np
 from typing import Dict, List, Tuple
-from onnx import mapping, NodeProto, TensorProto, AttributeProto
+from onnx import NodeProto, TensorProto, AttributeProto
 
 from .enum_defines import Colors, ModelConfig
 from .save_model import save_to_onnx_model
 from .graph import (ConstantEntry, EmptyEntry, GraphEntry, InputEntry, OutputEntry, Tensor, GraphNode, Graph)
+
+try:
+    from onnx.helper import tensor_dtype_to_np_dtype
+except ImportError:
+    from onnx import mapping
+
+    def tensor_dtype_to_np_dtype(tensor_dtype):
+        return mapping.TENSOR_TYPE_TO_NP_TYPE[tensor_dtype]
 
 def _parse_attr(ap: AttributeProto) -> Dict:
     """Convert AttributeProto to dict, with names as keys"""
@@ -193,7 +201,7 @@ def _convert_from_onnx_model(graph_path: str, model_config: ModelConfig, is_dump
     graph_outputs = [output.name for output in onnx_graph.output]
     for graph_input in onnx_graph.input:
         if graph_input.name not in params:
-            dtype = mapping.TENSOR_TYPE_TO_NP_TYPE[graph_input.type.tensor_type.elem_type]
+            dtype = np.dtype(tensor_dtype_to_np_dtype(graph_input.type.tensor_type.elem_type))
             shape = _convert_shape(graph_input.type.tensor_type.shape)
             tensor = Tensor(shape, dtype)
             node_entry = InputEntry(graph_input.name, tensor=tensor)
