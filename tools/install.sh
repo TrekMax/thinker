@@ -1,5 +1,5 @@
-pip uninstall thinker -y
+pip uninstall pythinker -y
 rm -rf dist/*
 python setup.py sdist
 
-pip install dist/thinker*.tar.gz
+pip install dist/pythinker*.tar.gz
